@@ -5,13 +5,13 @@
         // _Name 이렇게 언더바를 붙이는 것은 일종의 어노테이션 같은 것.
         _Brightness("Brightness",Range(0,1)) = 0.5
         // Range로 툴에서 범위내의 float 값을 얻을 수 있다.
-        _FloatValue("FloatValue",Float) = number
+        _FloatValue("FloatValue",Float) = 0.5
         // 그냥 float 값을 입력받는다
         _Color ("Color", Color) = (1,1,1,1)
         // Color 값을 입력 받는다
         _MainTex ("Albedo (RGB)", 2D) = "white" {}
         // 2D 텍스쳐를 받는다.
-        _VectorValue("Vector Value", Vector)=(number,number,number,number)
+        _VectorValue("Vector Value", Vector)=(1,1,1,1)
         //Vector 값을 받는다.
         _Glossiness ("Smoothness", Range(0,1)) = 0.5
         _Metallic ("Metallic", Range(0,1)) = 0.0
