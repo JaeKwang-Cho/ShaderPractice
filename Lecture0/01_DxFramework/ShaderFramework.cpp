@@ -42,28 +42,39 @@ const char*				gAppName		= "초간단 쉐이더 데모 프레임워크";
 // 진입점
 INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
 {
-    // 윈도우 클래스를 등록한다.
+    // 1. 윈도우 클래스를 등록한다.
+	// 프로그램이 창을 생성하기 위해서는 제일 먼저 윈도우 클래스를 등록해야한다.
+	// 1) 클래스 크기, 2) 스타일 3) 윈도우 프로시져 포인터 4) 클래스 추가 메모리 5) 윈도우 추가메모리
+	// 6) 핸들러 7) 아이콘 리소스 포인터 8) 커서 리소스 포인터 9) 브러쉬 핸들 10) 메뉴 이름 포인터
+	// 11) 클래스 이름 포인터 12) 아이콘 포인터
+	// 뭐... 정 하나하나가 궁금하면 찾아보자
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, MsgProc, 0L, 0L,
                       GetModuleHandle(NULL), NULL, NULL, NULL, NULL,
                       gAppName, NULL };
     RegisterClassEx( &wc );
 
-    // 프로그램 창을 생성한다.
+    // 2. 프로그램 창을 생성한다.
+	// 윈도우 클래스의 인스턴스를 생성한다.
+	// 역시 어떤 인자를 넘기는지 궁금하면 찾아보자
 	DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
     HWND hWnd = CreateWindow( gAppName, gAppName,
                               style, CW_USEDEFAULT, 0, WIN_WIDTH, WIN_HEIGHT,
                               GetDesktopWindow(), NULL, wc.hInstance, NULL );
 
-	// Client Rect 크기가 WIN_WIDTH, WIN_HEIGHT와 같도록 크기를 조정한다.
+	// 3. Client Rect 크기가 WIN_WIDTH, WIN_HEIGHT와 같도록 크기를 조정한다.
 	POINT ptDiff;
 	RECT rcClient, rcWindow;
 	
+	// 실제 렌더링이 가능한 공간이 Client Rect이다.
 	GetClientRect(hWnd, &rcClient);
 	GetWindowRect(hWnd, &rcWindow);
+	// 윈도우 틀로 짤리는 부분의 좌표를 구하고
 	ptDiff.x = (rcWindow.right - rcWindow.left) - rcClient.right;
 	ptDiff.y = (rcWindow.bottom - rcWindow.top) - rcClient.bottom;
+	// 조정한다.
 	MoveWindow(hWnd,rcWindow.left, rcWindow.top, WIN_WIDTH + ptDiff.x, WIN_HEIGHT + ptDiff.y, TRUE);
 
+	// 4. 이제 창을 보여준다.
     ShowWindow( hWnd, SW_SHOWDEFAULT );
     UpdateWindow( hWnd );
 

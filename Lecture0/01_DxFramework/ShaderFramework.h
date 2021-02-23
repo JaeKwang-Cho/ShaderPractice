@@ -26,7 +26,7 @@
 LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam );
 void ProcessInput(HWND hWnd, WPARAM keyPress);
 
-// 초기화 과련
+// 초기화 관련
 bool InitEverything(HWND hWnd);
 bool InitD3D(HWND hWnd);
 bool LoadAssets();
