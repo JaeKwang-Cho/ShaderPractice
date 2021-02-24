@@ -13,6 +13,13 @@
 #include "ShaderFramework.h"
 #include <stdio.h>
 
+// 투영행렬을 만들 때 필요한 상수들을 일단 정의
+#define PI				3.14159265f
+#define FOV				(PI/4.0f)						// 시야각
+#define ASPECT_RATIO	((WIN_WIDTH)/(float)WIN_HEIGHT)	// 화면 종횡비
+#define NEAR_PLANE		1								// 근접 평면
+#define FAR_PLANE		10000							// 원거리 평면
+
 
 //----------------------------------------------------------------------
 // 전역변수
@@ -25,9 +32,11 @@ LPDIRECT3DDEVICE9       gpD3DDevice		= NULL;				// D3D 장치
 // 폰트
 ID3DXFont*              gpFont			= NULL;
 
-// 모델
+// 모델 // LP의 D3D의 MESH 타입으로 
+LPD3DXMESH				gpSphere		= NULL;
 
-// 쉐이더
+// 쉐이더  // LP의 D3D의 XEFFECT 타입으로
+LPD3DXEFFECT			gpColorShader	= NULL;
 
 // 텍스처
 
@@ -177,6 +186,52 @@ void RenderFrame()
 // 3D 물체등을 그린다.
 void RenderScene()
 {
+	// 랜더 몽키에서는 변수 시멘틱을 통해 값들을 대입해주었지만
+	// 여기서는 이 값들을 직접 만들어서 셰이더에 전달해주어야한다.
+	
+	// 뷰 행렬을 만든다.
+	D3DXMATRIXA16 matView;
+	D3DXVECTOR3 vEyePt(0.0f, 0.0f, -200.0f);	// 카메라의 위치 벡터
+	D3DXVECTOR3 vLookatPt(0.0f, 0.0f, 0.0f);	// 바라보는 곳의 위치 벡터
+	D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);		// 카메라 위를 가리키는 벡터
+	// 그리고 그 벡터들을 인자로 MatrixLookAtLH()에 넣어주면 뷰 행렬을 만들 수 있다.
+	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec); 
+
+	// 투영 행렬을 만든다. (원근 투시법)
+	// 원근 투시법이냐, 직교투시법이냐에 따라 함수와 매개변수가 달라진다
+	D3DXMATRIXA16 matProjection;
+	// 위에서 정의했던 값들을 넣어준다.
+	D3DXMatrixPerspectiveFovLH(&matProjection, FOV, ASPECT_RATIO, NEAR_PLANE, FAR_PLANE);
+
+	// 월드 행렬을 만든다.
+	// 월드 행렬은 1. 한 물체의 위치와 방위 2.확장/축소 변환을 합친 것이다.
+	// *** 뷰행렬 및 투영행렬과 달리 각 물체마다 월드행렬을 만들어 주어야한다.
+	D3DXMATRIXA16 matWorld;
+	D3DXMatrixIdentity(&matWorld); // 그냥 단위행렬로 만드는 함수를 호출하자. (0,0,0)
+
+	// 이제 이 값을 셰이더에 전달해주자
+	// 1. 셰이더 안에서 사용하는 변수이름과 2. 위에서 정의한 16비트 매트릭스 포인터를 넣어준다.
+	gpColorShader->SetMatrix("gWorldMatrix", &matWorld);
+	gpColorShader->SetMatrix("gViewMatrix", &matView);
+	gpColorShader->SetMatrix("gProjectionMatrix", &matProjection); 
+
+	// 이제 셰이더가 가진 값들을 그릴 물체들에 적용하라고 GPU에게 명령한다.
+	// 모양과 함수들을 잘 보자
+	UINT numPasses = 0;
+	gpColorShader->Begin(&numPasses, NULL); // Begin()과 End() 사이에
+	{
+		for (UINT i = 0; i < numPasses; ++i)
+		{
+			gpColorShader->BeginPass(i); // BeginPass()와 EndPass() 가 있고
+			{
+				// 구체를 그린다.
+				gpSphere->DrawSubset(0); // 그 사이에 .x를 그리는 DrawSubset()이 있다.
+			}
+			gpColorShader->EndPass();
+		}
+	}
+	gpColorShader->End();
+	// 이렇게 하면 GPU가 gpColorShader를 이용해서 gpSphere를 그린다.
 }
 
 // 디버그 정보 등을 출력.
@@ -267,19 +322,28 @@ bool InitD3D(HWND hWnd)
     return true;
 }
 
+// 여기서 모델과 셰이더 파일을 로딩한다.
 bool LoadAssets()
 {
 	// 텍스처 로딩
-
+	
 	// 쉐이더 로딩
-
+	gpColorShader = LoadShader("ColorShader.fx");
+	if (!gpColorShader)
+	{
+		return false;
+	}
 	// 모델 로딩
-
+	gpSphere = LoadModel("sphere.x");
+	if (!gpSphere)
+	{
+		return false;
+	}
 	return true;
 }
 
 // 쉐이더 로딩
-// .fx 포멧으로 저장된 셰이더 파일
+// .fx 포멧으로 저장된 셰이더 파일을 로딩 및 컴파일 한다.
 // 정점셰이더와 픽셀셰이더를 모두 포함하고 있는 텍스트 파일이다.
 LPD3DXEFFECT LoadShader(const char * filename )
 {
@@ -291,8 +355,7 @@ LPD3DXEFFECT LoadShader(const char * filename )
 #if _DEBUG
 	dwShaderFlags |= D3DXSHADER_DEBUG;
 #endif
-
-	// .fx 파일을 로딩 및 컴파일 한다.
+	
 	// 1) D3D 디바이스 2. 셰이더 파일 이름 3. 셰이더를 컴파일 할 때 추가로 사용할 전처리#define
 	// 4) #include 지시문을 처리할 때 사용할 인터페이스 포인터 5) 셰이더를 컴파일할 때 사용할 플래그
 	// 6) 매개변수 공유에 사용할 이펙트 풀 7) 로딩된 이펙트를 저장할 포인터 8) 컴파일 에러 메시지를 가리키는 포인터
@@ -324,6 +387,7 @@ LPD3DXEFFECT LoadShader(const char * filename )
 LPD3DXMESH LoadModel(const char * filename)
 {
 	LPD3DXMESH ret = NULL;
+	// 모델을 로딩하는 메크로 함수
 	// 1) 파일명 2) 시스템 메모리에 메쉬를 로딩하기로 설정 3) D3D 장치 4) 인접 삼각형 데이터
 	// 5) 메테리얼 정보 6) 이펙트 인스턴스 7) 메테리얼 수 8) 로딩한 메쉬를 저장할 포인터
 	if ( FAILED(D3DXLoadMeshFromX(filename,D3DXMESH_SYSTEMMEM, gpD3DDevice, NULL,NULL,NULL,NULL, &ret)) )
@@ -367,12 +431,20 @@ void Cleanup()
 	}
 
 	// 모델을 release 한다.
-
+	if (gpSphere)
+	{
+		gpSphere->Release();
+		gpSphere = NULL;
+	}
 	// 쉐이더를 release 한다.
-
+	if (gpColorShader)
+	{
+		gpColorShader->Release();
+		gpColorShader = NULL;
+	}
 	// 텍스처를 release 한다.
 
-	// D3D를 release 한다.
+	// 마지막으로 D3D를 release 한다.
     if(gpD3DDevice)
 	{
         gpD3DDevice->Release();
