@@ -78,13 +78,15 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
     ShowWindow( hWnd, SW_SHOWDEFAULT );
     UpdateWindow( hWnd );
 
-	// D3D를 비롯한 모든 것을 초기화한다.
+	// 5. D3D를 비롯한 모든 것을 초기화한다.
 	if( !InitEverything(hWnd) )
 		PostQuitMessage(1);
 
-	// 메시지 루프
+	// 6. 메시지 루프
     MSG msg;
+	// 일종의 메크로 함수 메모리를 0을 초기화
     ZeroMemory(&msg, sizeof(msg));
+	// WM_QUIT 받기 전까지 계속 돌린다.
     while(msg.message!=WM_QUIT)
     {
 		if( PeekMessage( &msg, NULL, 0U, 0U, PM_REMOVE ) )
@@ -97,7 +99,7 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
 			PlayDemo();
 		}
     }
-
+	// 이것도 제공 메크로함수이고, 윈도우 클래스의 등록을 해제한다.
     UnregisterClass( gAppName, wc.hInstance );
     return 0;
 }
@@ -116,7 +118,7 @@ LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
         PostQuitMessage(0);
         return 0;
     }
-
+	// 처리하지 않는 메시지를 default 기본 처리
     return DefWindowProc( hWnd, msg, wParam, lParam );
 }
 
@@ -127,6 +129,7 @@ void ProcessInput( HWND hWnd, WPARAM keyPress)
 	{
 	// ESC 키가 눌리면 프로그램을 종료한다.
 	case VK_ESCAPE:
+		// 윈도우 핸들에게 메시지를 보내는 메크로함수
 		PostMessage(hWnd, WM_DESTROY, 0L, 0L);
 		break;
 	}
@@ -154,15 +157,19 @@ void RenderFrame()
 {
 	D3DCOLOR bgColour = 0xFF0000FF;	// 배경색상 - 파랑
 
+	// 깔끔하게 색만 남기고, 깊이/스텐실을 clear 한다.
     gpD3DDevice->Clear( 0, NULL, (D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER), bgColour, 1.0f, 0 );
 
+	// 씬을 그리기 시작한다.
     gpD3DDevice->BeginScene();
     {
 		RenderScene();				// 3D 물체등을 그린다.
 		RenderInfo();				// 디버그 정보 등을 출력한다.
     }
+	// 씬을 다 그렸으면
 	gpD3DDevice->EndScene();
 
+	// 백버퍼에 있는 씬을 화면에 뿌린다.
     gpD3DDevice->Present( NULL, NULL, NULL, NULL );
 }
 
@@ -207,6 +214,8 @@ bool InitEverything(HWND hWnd)
 	}
 
 	// 폰트를 로딩
+	// 1) D3D 디바이스 2) 폰트 높이 3) 폰트 너비 4) 볼드체 5) mipmap 레벨 6) 이텔릭체 여부 7) 문자set 8) 실제 출력폰트가 지정된 속성과 어느정도 비슷해야하는지 설정
+	// 9) 실제 출력폰트가 품질이 어느정도 좋아햐 하는지 설정 8) 피치(가로폭)과 패밀리(가족) 설정 9) 폰트 이름 10) 폰트 저장할 out 포인터
     if(FAILED(D3DXCreateFont( gpD3DDevice, 20, 10, FW_BOLD, 1, FALSE, DEFAULT_CHARSET, 
                            OUT_DEFAULT_PRECIS, DEFAULT_QUALITY, (DEFAULT_PITCH | FF_DONTCARE), 
                            "Arial", &gpFont )))
@@ -231,22 +240,23 @@ bool InitD3D(HWND hWnd)
     D3DPRESENT_PARAMETERS d3dpp;
     ZeroMemory( &d3dpp, sizeof(d3dpp) );
 
-	d3dpp.BackBufferWidth				= WIN_WIDTH;
-	d3dpp.BackBufferHeight				= WIN_HEIGHT;
-	d3dpp.BackBufferFormat				= D3DFMT_X8R8G8B8;
-    d3dpp.BackBufferCount				= 1;
+	d3dpp.BackBufferWidth				= WIN_WIDTH;	// 렌더링 영역, 백버퍼의 너비
+	d3dpp.BackBufferHeight				= WIN_HEIGHT;	// 백버퍼의 높이
+	d3dpp.BackBufferFormat				= D3DFMT_X8R8G8B8;// 백버퍼의 포멧
+    d3dpp.BackBufferCount				= 1;			
     d3dpp.MultiSampleType				= D3DMULTISAMPLE_NONE;
     d3dpp.MultiSampleQuality			= 0;
-    d3dpp.SwapEffect					= D3DSWAPEFFECT_DISCARD;
+    d3dpp.SwapEffect					= D3DSWAPEFFECT_DISCARD;// 백버퍼를 스왑할 때의 효과. 성능상 이게 좋다.
     d3dpp.hDeviceWindow					= hWnd;
     d3dpp.Windowed						= TRUE;
     d3dpp.EnableAutoDepthStencil		= TRUE;
-    d3dpp.AutoDepthStencilFormat		= D3DFMT_D24X8;
+    d3dpp.AutoDepthStencilFormat		= D3DFMT_D24X8; // 깊이/스텐실 버퍼의 포맷
     d3dpp.Flags							= D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
     d3dpp.FullScreen_RefreshRateInHz	= 0;
-    d3dpp.PresentationInterval			= D3DPRESENT_INTERVAL_ONE;
+    d3dpp.PresentationInterval			= D3DPRESENT_INTERVAL_ONE; // 모니터 주사율과 백버퍼를 스왑하는 빈도간의 관계. 이것은 모니터가 수직 동기될 때마다 백버퍼를 스왑해준다.
+	// 게임에서는 성능상 모니터의 수직 동기를 기다리지 않고 곧바로 스왑해 주는 경우가 많다.(D3DPRESENT IMMEDIATE) 단, 이럴 때는 전 프레임과 현재 프레임이 서로 찢겨보이는 부작용이 있다.
 
-    // D3D장치를 생성한다.
+    // 위 정보(D3DPRESENT_PARAMETERS 구조체)를 가지고 D3D장치를 생성한다.
     if( FAILED( gpD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd,
 									D3DCREATE_HARDWARE_VERTEXPROCESSING,
                                     &d3dpp, &gpD3DDevice ) ) )
@@ -269,6 +279,8 @@ bool LoadAssets()
 }
 
 // 쉐이더 로딩
+// .fx 포멧으로 저장된 셰이더 파일
+// 정점셰이더와 픽셀셰이더를 모두 포함하고 있는 텍스트 파일이다.
 LPD3DXEFFECT LoadShader(const char * filename )
 {
 	LPD3DXEFFECT ret = NULL;
@@ -280,6 +292,10 @@ LPD3DXEFFECT LoadShader(const char * filename )
 	dwShaderFlags |= D3DXSHADER_DEBUG;
 #endif
 
+	// .fx 파일을 로딩 및 컴파일 한다.
+	// 1) D3D 디바이스 2. 셰이더 파일 이름 3. 셰이더를 컴파일 할 때 추가로 사용할 전처리#define
+	// 4) #include 지시문을 처리할 때 사용할 인터페이스 포인터 5) 셰이더를 컴파일할 때 사용할 플래그
+	// 6) 매개변수 공유에 사용할 이펙트 풀 7) 로딩된 이펙트를 저장할 포인터 8) 컴파일 에러 메시지를 가리키는 포인터
 	D3DXCreateEffectFromFile(gpD3DDevice, filename,
 		NULL, NULL, dwShaderFlags, NULL, &ret, &pError);
 
@@ -303,9 +319,13 @@ LPD3DXEFFECT LoadShader(const char * filename )
 }
 
 // 모델 로딩
+// .x 포맷으로 저장된 모델을 로딩
+// DirectX에서 자체적으로 지원하는 메쉬 포맷이다.
 LPD3DXMESH LoadModel(const char * filename)
 {
 	LPD3DXMESH ret = NULL;
+	// 1) 파일명 2) 시스템 메모리에 메쉬를 로딩하기로 설정 3) D3D 장치 4) 인접 삼각형 데이터
+	// 5) 메테리얼 정보 6) 이펙트 인스턴스 7) 메테리얼 수 8) 로딩한 메쉬를 저장할 포인터
 	if ( FAILED(D3DXLoadMeshFromX(filename,D3DXMESH_SYSTEMMEM, gpD3DDevice, NULL,NULL,NULL,NULL, &ret)) )
 	{
 		OutputDebugString("모델 로딩 실패: ");
@@ -317,9 +337,11 @@ LPD3DXMESH LoadModel(const char * filename)
 }
 
 // 텍스처 로딩
+// 다양한 포맷으로 저장된 이미지들을 텍스처로 로딩
 LPDIRECT3DTEXTURE9 LoadTexture(const char * filename)
 {
 	LPDIRECT3DTEXTURE9 ret = NULL;
+	// 1) D3D 장치 2) 파일명 3) 텍스쳐 저장포인터
 	if ( FAILED(D3DXCreateTextureFromFile(gpD3DDevice, filename, &ret)) )
 	{
 		OutputDebugString("텍스처 로딩 실패: ");
@@ -333,6 +355,8 @@ LPDIRECT3DTEXTURE9 LoadTexture(const char * filename)
 // 뒷정리 코드.
 //------------------------------------------------------------
 
+// 메모리 누수를 방지하기 위해 생성했던 자원들을 모조리 해제 해주어야 한다.
+// 개체들도 다 해제해준다.
 void Cleanup()
 {
 	// 폰트를 release 한다.
