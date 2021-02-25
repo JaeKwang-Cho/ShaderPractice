@@ -41,7 +41,7 @@ LPD3DXEFFECT			gpColorShader	= NULL;
 // 텍스처
 
 // 프로그램 이름
-const char*				gAppName		= "초간단 쉐이더 데모 프레임워크";
+const char*				gAppName		= "컬러 쉐이더 프레임워크";
 
 
 //-----------------------------------------------------------------------

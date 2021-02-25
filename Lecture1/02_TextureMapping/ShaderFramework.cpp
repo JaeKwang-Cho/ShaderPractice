@@ -39,7 +39,7 @@ LPD3DXEFFECT			gpTextureMappingShader	= NULL;
 // 텍스처
 LPDIRECT3DTEXTURE9		gpEarthDM				= NULL; // 지구 텍스처를 메모리에 저장
 // 프로그램 이름
-const char* gAppName = "초간단 쉐이더 데모 프레임워크";
+const char* gAppName = "텍스쳐 매핑 프레임워크";
 // 회전값
 float gRotationY = 0.0f;
 
