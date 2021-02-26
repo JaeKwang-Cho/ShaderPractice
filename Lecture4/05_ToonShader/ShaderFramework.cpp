@@ -33,22 +33,23 @@ LPDIRECT3DDEVICE9       gpD3DDevice			= NULL;			// D3D 장치
 ID3DXFont* gpFont = NULL;
 
 // 모델
-LPD3DXMESH				gpSphere			= NULL;
+LPD3DXMESH				gpTeapot			= NULL;
 // 쉐이더
-LPD3DXEFFECT			gpSpecularMappingShader	= NULL;
-// 텍스처
-LPDIRECT3DTEXTURE9		gpStoneDM			= NULL;
-LPDIRECT3DTEXTURE9		gpStoneSM			= NULL;
+LPD3DXEFFECT			gpToonShader		= NULL;
 
 // 빛의 색상
-D3DXVECTOR4				gLightColor(0.7f, 0.7f, 1.0f,1.0f);
+
+// 광원의 위치
+D3DXVECTOR4				gWorldLightPosition = D3DXVECTOR4(500.0f, 500.0f, -500.0f, 1.0f);
+
+// 표면의 색상
+D3DXVECTOR4				gSurfaceColor = D3DXVECTOR4(0, 1, 0, 1);
 
 // 프로그램 이름
-const char* gAppName = "Diffuse and Specular 쉐이더 프레임워크";
+const char* gAppName = "툰 쉐이더 프레임워크";
 // 회전값
 float gRotationY = 0.0f;
-// 빛의 위치
-D3DXVECTOR4				gWorldLightPosition(500.0f, 500.0f, -500.0f, 1.0f);
+
 // 카메라 위치
 D3DXVECTOR4				gWorldCameraPosition(0.0f, 0.0f, -200.0f, 1.0f);
 
@@ -208,7 +209,7 @@ void RenderScene()
 	// 위에서 정의했던 값들을 넣어준다.
 	D3DXMatrixPerspectiveFovLH(&matProjection, FOV, ASPECT_RATIO, NEAR_PLANE, FAR_PLANE);
 	
-	// 지구를 y축 중심으로 조금씩 회전 시킨다
+	// 주전자를를 y축 중심으로 조금씩 회전 시킨다
 	gRotationY += 0.4f * PI / 180.0f;
 	if (gRotationY > 2 * PI)
 	{
@@ -221,36 +222,43 @@ void RenderScene()
 	D3DXMATRIXA16 matWorld;
 	D3DXMatrixRotationY(&matWorld,gRotationY); // y축으로 돌리는 월드 행렬을 만든다.
 
-	// 이제 이 값을 셰이더에 전달해주자
-	// 1. 셰이더 안에서 사용하는 변수이름과 2. 위에서 정의한 16비트 매트릭스 포인터를 넣어준다.
-	gpSpecularMappingShader->SetMatrix("gWorldMatrix", &matWorld);
-	gpSpecularMappingShader->SetMatrix("gViewMatrix", &matView);
-	gpSpecularMappingShader->SetMatrix("gProjectionMatrix", &matProjection);
+	// 월드 행렬의 역행렬을 구한다.
+	D3DXMATRIXA16 matInvWorld;
+	// 월드 행렬은 직교행렬이여서 전치행렬과 같다.
+	D3DXMatrixTranspose(&matInvWorld, &matWorld);
+	// 정 불안하면 D3DXMatrixInverse()를 이용하자
 
-	gpSpecularMappingShader->SetVector("gLightColor", &gLightColor);
-	gpSpecularMappingShader->SetTexture("DiffuseMap_Tex", gpStoneDM);
-	gpSpecularMappingShader->SetTexture("SpecularMap_Tex", gpStoneSM);
+	// 월드/뷰/투영 행렬을 미리 곱한다.
+	D3DXMATRIXA16 matWorldView;
+	D3DXMATRIXA16 matWorldViewProjection;
+	D3DXMatrixMultiply(&matWorldView, &matWorld, &matView);
+	D3DXMatrixMultiply(&matWorldViewProjection, &matWorldView, &matProjection);
 
-	gpSpecularMappingShader->SetVector("gWorldLightPosition", &gWorldLightPosition);
-	gpSpecularMappingShader->SetVector("gWorldCameraPosition", &gWorldCameraPosition);
+	// 행렬을 쉐이더에 넣어준다.
+	gpToonShader->SetMatrix("gWorldViewProjectionMatrix", &matWorldViewProjection);
+	gpToonShader->SetMatrix("gInvWorldMatrix", &matInvWorld);
+
+	// 광원 위치와 표면 색상을 넣어준다
+	gpToonShader->SetVector("gWorldLightPosition", &gWorldLightPosition);
+	gpToonShader->SetVector("gSurfaceColor", &gSurfaceColor);
 
 
 	// 이제 셰이더가 가진 값들을 그릴 물체들에 적용하라고 GPU에게 명령한다.
 	// 모양과 함수들을 잘 보자
 	UINT numPasses = 0;
-	gpSpecularMappingShader->Begin(&numPasses, NULL); // Begin()과 End() 사이에
+	gpToonShader->Begin(&numPasses, NULL); // Begin()과 End() 사이에
 	{
 		for (UINT i = 0; i < numPasses; ++i)
 		{
-			gpSpecularMappingShader->BeginPass(i); // BeginPass()와 EndPass() 가 있고
+			gpToonShader->BeginPass(i); // BeginPass()와 EndPass() 가 있고
 			{
 				// 구체를 그린다.
-				gpSphere->DrawSubset(0); // 그 사이에 .x를 그리는 DrawSubset()이 있다.
+				gpTeapot->DrawSubset(0); // 그 사이에 .x를 그리는 DrawSubset()이 있다.
 			}
-			gpSpecularMappingShader->EndPass();
+			gpToonShader->EndPass();
 		}
 	}
-	gpSpecularMappingShader->End();
+	gpToonShader->End();
 	// 이렇게 하면 GPU가 gpColorShader를 이용해서 gpSphere를 그린다.
 }
 
@@ -345,25 +353,15 @@ bool InitD3D(HWND hWnd)
 bool LoadAssets()
 {
 	// 텍스처 로딩
-	gpStoneDM = LoadTexture("fieldstone_DM.tga");
-	if (!gpStoneDM)
-	{
-		return false;
-	}
-	gpStoneSM = LoadTexture("fieldstone_SM.tga");
-	if (!gpStoneSM)
-	{
-		return false;
-	}
 	// 쉐이더 로딩
-	gpSpecularMappingShader = LoadShader("SpecularMapping.fx");
-	if (!gpSpecularMappingShader)
+	gpToonShader = LoadShader("ToonShader.fx");
+	if (!gpToonShader)
 	{
 		return false;
 	}
 	// 모델 로딩
-	gpSphere = LoadModel("Sphere.x");
-	if (!gpSphere)
+	gpTeapot = LoadModel("Teapot.x");
+	if (!gpTeapot)
 	{
 		return false;
 	}
@@ -460,28 +458,19 @@ void Cleanup()
 	}
 
 	// 모델을 release 한다.
-	if (gpSphere)
+	if (gpTeapot)
 	{
-		gpSphere->Release();
-		gpSphere = NULL;
+		gpTeapot->Release();
+		gpTeapot = NULL;
 	}
 	// 쉐이더를 release 한다.
-	if (gpSpecularMappingShader)
+	if (gpToonShader)
 	{
-		gpSpecularMappingShader->Release();
-		gpSpecularMappingShader = NULL;
+		gpToonShader->Release();
+		gpToonShader = NULL;
 	}
 	// 텍스처를 release 한다.
-	if (gpStoneDM)
-	{
-		gpStoneDM->Release();
-		gpStoneDM = NULL;
-	}
-	if (gpStoneSM)
-	{
-		gpStoneSM->Release();
-		gpStoneSM = NULL;
-	}
+
 	// D3D를 release 한다.
 	if (gpD3DDevice)
 	{
