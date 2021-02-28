@@ -1,0 +1,6 @@
+D:\ShaderPractice\Lecture6\7_EnvironmentMapping\Debug\EnvironmentMapping.cso
+D:\ShaderPractice\Lecture6\7_EnvironmentMapping\Debug\BasicFramework.exe
+D:\ShaderPractice\Lecture6\7_EnvironmentMapping\Debug\BasicFramework.pdb
+D:\ShaderPractice\Lecture7\8_UVAnimation\Debug\UVAnimation.cso
+D:\ShaderPractice\Lecture7\8_UVAnimation\Debug\BasicFramework.exe
+D:\ShaderPractice\Lecture7\8_UVAnimation\Debug\BasicFramework.pdb

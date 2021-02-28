@@ -1,0 +1,11 @@
+C:\Users\USER\Desktop\ShaderSamples\01_DxFramework\Debug\BasicFramework.exe
+C:\Users\USER\Desktop\ShaderSamples\01_DxFramework\Debug\BasicFramework.pdb
+D:\ShaderPractice\Lecture0\01_DxFramework\Debug\BasicFramework.exe
+D:\ShaderPractice\Lecture0\01_DxFramework\Debug\BasicFramework.pdb
+D:\ShaderPractice\Lecture0\01_DxFramework\Debug\ColorShader.cso
+D:\ShaderPractice\Lecture1\02_TextureMapping\Debug\BasicFramework.exe
+D:\ShaderPractice\Lecture1\02_TextureMapping\Debug\BasicFramework.pdb
+D:\ShaderPractice\Lecture1\02_TextureMapping\Debug\TextureMapping.cso
+D:\ShaderPractice\Lecture2\03_Lighting\Debug\Lighting.cso
+D:\ShaderPractice\Lecture2\03_Lighting\Debug\BasicFramework.exe
+D:\ShaderPractice\Lecture2\03_Lighting\Debug\BasicFramework.pdb

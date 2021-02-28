@@ -1,0 +1,6 @@
+﻿FXC : warning X4717: Effects deprecated for D3DCompiler_47
+  
+  compilation object save succeeded; see D:\ShaderPractice\Lecture0\01_DxFramework\Debug\ColorShader.cso
+cl : 명령줄 warning D9035: 'Gm' 옵션은 더 이상 사용되지 않으므로 이후 릴리스에서 제거될 예정입니다.
+  ShaderFramework.cpp
+  BasicFramework.vcxproj -> D:\ShaderPractice\Lecture0\01_DxFramework\Debug\BasicFramework.exe

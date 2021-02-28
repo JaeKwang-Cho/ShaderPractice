@@ -1,0 +1,3 @@
+D:\ShaderPractice\Lecture5\6_NormalMapping\Debug\NormalMapping.cso
+D:\ShaderPractice\Lecture5\6_NormalMapping\Debug\BasicFramework.exe
+D:\ShaderPractice\Lecture5\6_NormalMapping\Debug\BasicFramework.pdb

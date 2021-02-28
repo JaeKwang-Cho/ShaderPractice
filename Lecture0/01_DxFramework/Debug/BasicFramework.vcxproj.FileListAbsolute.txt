@@ -1,0 +1,5 @@
+C:\Users\USER\Desktop\ShaderSamples\01_DxFramework\Debug\BasicFramework.exe
+C:\Users\USER\Desktop\ShaderSamples\01_DxFramework\Debug\BasicFramework.pdb
+D:\ShaderPractice\Lecture0\01_DxFramework\Debug\BasicFramework.exe
+D:\ShaderPractice\Lecture0\01_DxFramework\Debug\BasicFramework.pdb
+D:\ShaderPractice\Lecture0\01_DxFramework\Debug\ColorShader.cso
