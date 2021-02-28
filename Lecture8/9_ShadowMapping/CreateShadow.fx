@@ -15,12 +15,12 @@
 //**************************************************************//
 
 //--------------------------------------------------------------//
-// ShadowMapping
+// CreateShadowShader
 //--------------------------------------------------------------//
 //--------------------------------------------------------------//
 // CreateShadow
 //--------------------------------------------------------------//
-string ShadowMapping_CreateShadow_Torus : ModelData = "..\\..\\..\\Program Files (x86)\\AMD\\RenderMonkey 1.82\\Examples\\Media\\Models\\Torus.3ds";
+string CreateShadowShader_CreateShadow_Torus : ModelData = ".\\Torus.x";
 
 texture ShadowMap_Tex : RenderColorTarget
 <
@@ -29,64 +29,64 @@ texture ShadowMap_Tex : RenderColorTarget
    float  ClearDepth=1.000000;
    int    ClearColor=-1;
 >;
-float4x4 gWorldMatrix : World;
-float4x4 gLightViewMatrix;
-float4x4 gLightProjectionMatrix : Projection;
-
-float4 gWorldLightPosition
-<
-   string UIName = "gWorldLightPosition";
-   string UIWidget = "Direction";
-   bool UIVisible =  false;
-   float4 UIMin = float4( -10.00, -10.00, -10.00, -10.00 );
-   float4 UIMax = float4( 10.00, 10.00, 10.00, 10.00 );
-   bool Normalize =  false;
-> = float4( 500.00, 500.00, -500.00, 1.00 );
-
 struct VS_INPUT 
 {
-   float4 mPosition : POSITION0;
+   float4 mPosition: POSITION;
 };
 
 struct VS_OUTPUT 
 {
-   float4 mPosition : POSITION0;
-   float4 mClipPosition: TEXCOORD1;   
+   float4 mPosition: POSITION;
+   float4 mClipPosition: TEXCOORD1;
 };
 
-VS_OUTPUT ShadowMapping_CreateShadow_Vertex_Shader_vs_main( VS_INPUT Input )
+float4x4 gWorldMatrix : World;
+float4x4 gLightViewMatrix
+<
+   string UIName = "gLightViewMatrix";
+   string UIWidget = "Numeric";
+   bool UIVisible =  false;
+> = float4x4( 1.00, 0.00, 0.00, 0.00, 0.00, 1.00, 0.00, 0.00, 0.00, 0.00, 1.00, 0.00, 0.00, 0.00, 0.00, 1.00 );
+float4x4 gLightProjectionMatrix : Projection;
+
+float4 gWorldLightPosition;
+
+VS_OUTPUT CreateShadowShader_CreateShadow_Vertex_Shader_vs_main( VS_INPUT Input )
 {
    VS_OUTPUT Output;
+  
+   float4x4 lightViewMatrix = gLightViewMatrix;
 
-   Output.mPosition = mul(Input.mPosition,gWorldMatrix);
-   Output.mPosition = mul(Output.mPosition,lightViewMatrix);
-   Output.mPosition = mul(Output.mPosition,gLightProjectionMatrix);
-   
+   Output.mPosition = mul(Input.mPosition, gWorldMatrix);
+   Output.mPosition = mul(Output.mPosition, lightViewMatrix);
+   Output.mPosition = mul(Output.mPosition, gLightProjectionMatrix);
+
    Output.mClipPosition = Output.mPosition;
    
    return Output;
-    
 }
-
-
-
-
-struct PS_INPUT
+struct PS_INPUT 
 {
-   float4 mClipPosition :TEXCOORD1;
+   float4 mClipPosition: TEXCOORD1;
 };
 
-float4 ShadowMapping_CreateShadow_Pixel_Shader_ps_main(PS_INPUT Input) : COLOR
-{
-   float depth = Input.mClipPosition.z/Input.mClipPosition.w;
-   return float4(depth.xxx,1);
+float4 CreateShadowShader_CreateShadow_Pixel_Shader_ps_main(PS_INPUT Input) : COLOR
+{   
+   float depth = Input.mClipPosition.z / Input.mClipPosition.w;
+   return float4(depth.xxx, 1);
 }
 
 
+float4x4 CreateShadowShader_CreateShadow_Pixel_Shader_gWorldMatrix;
+float4x4 CreateShadowShader_CreateShadow_Pixel_Shader_gLightViewMatrix;
+float4x4 CreateShadowShader_CreateShadow_Pixel_Shader_gLightProjectionMatrix;
+
+float4 CreateShadowShader_CreateShadow_Pixel_Shader_gWorldLightPosition;
+
 //--------------------------------------------------------------//
-// Technique Section for ShadowMapping
+// Technique Section for CreateShadowShader
 //--------------------------------------------------------------//
-technique ShadowMapping
+technique CreateShadowShader
 {
    pass CreateShadow
    <
@@ -95,8 +95,9 @@ technique ShadowMapping
                       "ClearDepth = 1.000000;";
    >
    {
-      VertexShader = compile vs_2_0 ShadowMapping_CreateShadow_Vertex_Shader_vs_main();
-      PixelShader = compile ps_2_0 ShadowMapping_CreateShadow_Pixel_Shader_ps_main();
+
+      VertexShader = compile vs_2_0 CreateShadowShader_CreateShadow_Vertex_Shader_vs_main();
+      PixelShader = compile ps_2_0 CreateShadowShader_CreateShadow_Pixel_Shader_ps_main();
    }
 
 }

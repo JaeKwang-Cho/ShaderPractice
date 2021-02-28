@@ -41,9 +41,9 @@ LPD3DXEFFECT			gpCreateShadowShader = NULL;
 // 텍스처
 
 // 프로그램 이름
-const char* gAppName = "ShadowMapping 쉐이더 프레임워크";
+const char*				gAppName = "ShadowMapping 쉐이더 프레임워크";
 // 회전값
-float gRotationY = 0.0f;
+float					gRotationY = 0.0f;
 // 빛의 위치
 D3DXVECTOR4				gWorldLightPosition(500.0f, 500.0f, -500.0f, 1.0f);
 // 카메라 위치
@@ -178,7 +178,7 @@ void Update()
 
 void RenderFrame()
 {
-	D3DCOLOR bgColour = 0xFF0000FF;	// 배경색상 - 파랑
+	D3DCOLOR bgColour = 0x00000000;	// 배경색상 - 파랑
 
 	// 깔끔하게 색만 남기고, 깊이/스텐실을 clear 한다.
 	gpD3DDevice->Clear(0, NULL, (D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER), bgColour, 1.0f, 0);
@@ -199,60 +199,185 @@ void RenderFrame()
 
 // 3D 물체등을 그린다.
 void RenderScene()
-{asFASDFASD
-	// 뷰 행렬을 만든다.
-	D3DXMATRIXA16 matView;
-	D3DXVECTOR3 vEyePt(gWorldCameraPosition.x, gWorldCameraPosition.y, gWorldCameraPosition.z);	// 카메라의 위치 벡터
-	D3DXVECTOR3 vLookatPt(0.0f, 0.0f, 0.0f);	// 바라보는 곳의 위치 벡터
-	D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);		// 카메라 위를 가리키는 벡터
-
-	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);
-
-	// 투영 행렬을 만든다. (원근 투시법)
-	D3DXMATRIXA16 matProjection;
-	// 위에서 정의했던 값들을 넣어준다.
-	D3DXMatrixPerspectiveFovLH(&matProjection, FOV, ASPECT_RATIO, NEAR_PLANE, FAR_PLANE);
-	
-	// 지구를 y축 중심으로 조금씩 회전 시킨다
-	gRotationY += 0.4f * PI / 180.0f;
-	if (gRotationY > 2 * PI)
+{
+	// 광원 뷰 행렬을 만든다.
+	D3DXMATRIXA16	matLightView;
 	{
-		gRotationY -= 2 * PI;
+		// 빛의 위치 (사실은 시점의 위치)
+		D3DXVECTOR3 vEyePt(gWorldLightPosition.x, gWorldLightPosition.y, gWorldLightPosition.z);
+		// 빛은 원점을 바라본다. 
+		D3DXVECTOR3 vLookatPt(0.0f, 0.0f, 0.0f);
+		// 필드의 위쪽을 정의하는 벡터
+		D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);
+		// 1) 결과 포인터 2) 카메라 벡터 3) 바라보는 방향 벡터 4) 필드의 위쪽을 가리키는 벡터
+		D3DXMatrixLookAtLH(&matLightView, &vEyePt, &vLookatPt, &vUpVec);
+	}
+	// 광원 투영 행렬을 만든다.
+	D3DXMATRIXA16 matLightProjection;
+	{
+		// 1)결과 포인터 2) y 방향의 시야(라디안) 3) 가로세로 비율 4) 가까운 뷰 평면의 z 값 5) 먼 뷰 평면의 z 값
+		D3DXMatrixPerspectiveFovLH(&matLightProjection, D3DX_PI / 4.0f, 1, 1, 3000);
+	}
+	// 뷰/튜영 행렬을 만든다.
+	D3DXMATRIXA16 matViewProjection;
+	{
+		// 뷰 행렬을 만든다.
+		D3DXMATRIXA16 matView;
+		// 카메라 위치
+		D3DXVECTOR3 vEyePt(gWorldCameraPosition.x, gWorldCameraPosition.y, gWorldCameraPosition.z);
+		// 카메라가 바라보는 곳
+		D3DXVECTOR3 vLookatPt(0.0f, 0.0f, 0.0f);
+		// 필드의 위쪽 방향 벡터
+		D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);
+		// 1) 결과 포인터 2) 카메라 위치 3) 카메라가 바로보는 곳 4) 필드의 위쪽 방향 벡터
+		D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);
+
+		// 투영행렬을 만든다.
+		D3DXMATRIXA16		 matProjection;
+		// 1) 결과 포인터 2) y 방향의 시야(라디안) 3) 화면 종횡비 4) 가까운 뷰 평면의 z 값 5) 먼 뷰평면의 z 값
+		D3DXMatrixPerspectiveFovLH(&matProjection, FOV, ASPECT_RATIO, NEAR_PLANE, FAR_PLANE);
+
+		// 1) 결과 포인터 = A*B 2) A 3) B 
+		D3DXMatrixMultiply(&matViewProjection, &matView, &matProjection);
+	}
+	// 원환체의 월드 행렬을 만든다.
+	D3DXMATRIXA16 matTorusWorld;
+	{
+		//프레임 마다 0.4도씩 회전을 시킨다.
+		gRotationY += 0.4f * PI / 180.0f;
+		if (gRotationY > 2 * PI)
+		{
+			gRotationY -= 2 * PI;
+		}
+		// 주어진 값만큼 돌리는 함수
+		D3DXMatrixRotationY(&matTorusWorld, gRotationY);
+	}
+	// 디스크의 월드 행렬을 만든다.
+	D3DXMATRIXA16		 matDiscWorld;
+	{
+		// 확대할 때 이용하는 행렬
+		D3DXMATRIXA16 matScale;
+		D3DXMatrixScaling(&matScale, 2, 2, 2);
+
+		// 평행이동 할때 이용하는 행렬
+		D3DXMATRIXA16 matTrans;
+		D3DXMatrixTranslation(&matTrans, 0, -40, 0);
+
+		D3DXMatrixMultiply(&matDiscWorld, &matScale, &matTrans);
 	}
 
-	// 월드 행렬을 만든다.
-	// 월드 행렬은 1. 한 물체의 위치와 방위 2.확장/축소 변환을 합친 것이다.
-	// *** 뷰행렬 및 투영행렬과 달리 각 물체마다 월드행렬을 만들어 주어야한다.
-	D3DXMATRIXA16 matWorld;
-	D3DXMatrixRotationY(&matWorld,gRotationY); // y축으로 돌리는 월드 행렬을 만든다.
+	/* 이제 렌더링을 한다*/
+	// 1. 그림자를 만든다.
+	//	- 하드웨어 백버퍼 대신에 그림자 맵을 렌더타깃으로 설정하고
+	//	- gpShadowShader로 원환체를 그린다.
+	// 2. 일반적인 렌더링을 하는데 그위에 그림자를 씌운다.
+	//	- 하드웨어 백버퍼를 렌더 타깃으로 설정하고, 원환체와 디스크를 그린다.
+	// (이때 위치와 색이 다르므로 그에 맞게 셰이더 변수도 지정해준다.)
 
-	// 이제 이 값을 셰이더에 전달해주자
-	// 1. 셰이더 안에서 사용하는 변수이름과 2. 위에서 정의한 16비트 매트릭스 포인터를 넣어준다.
-	gpLightingShader->SetMatrix("gWorldMatrix", &matWorld);
-	gpLightingShader->SetMatrix("gViewMatrix", &matView);
-	gpLightingShader->SetMatrix("gProjectionMatrix", &matProjection);
+	// 현재 하드웨어 백버퍼와 깊이버퍼
+	LPDIRECT3DSURFACE9 pHWBackBuffer = NULL;
+	LPDIRECT3DSURFACE9 pHWDepthStencilBuffer = NULL;
+	// 렌더 타겟을 얻을 수 있는, D3D 장치 제공함수 (첫번째 인자는 인덱스)
+	gpD3DDevice->GetRenderTarget(0, &pHWBackBuffer);
+	// 깊이 버퍼의 포인터를 구할 수 있는 D3D 장치 제공함수
+	gpD3DDevice->GetDepthStencilSurface(&pHWDepthStencilBuffer);
 
-	gpLightingShader->SetVector("gWorldLightPosition", &gWorldLightPosition);
-	gpLightingShader->SetVector("gWorldCameraPosition", &gWorldCameraPosition);
+	/* 1. 그림자 만들기 */
+	// 그림차맵의 렌더 타겟과 깊이 버퍼를 사용한다.
+	LPDIRECT3DSURFACE9 pShadowSurface = NULL;
+	// 인자로 SURFACE를 받는 TEXTURE 제공함수
+	// 렌더 타겟에서 첫번째 밉맵을 가져와서 렌더 타겟으로 넣어주고
+	if (SUCCEEDED(gpShadowRenderTarget->GetSurfaceLevel(0, &pShadowSurface)))
+	{
+		// 그것을 세팅한다. (첫번째 인자는 인덱스)
+		gpD3DDevice->SetRenderTarget(0, pShadowSurface);
+		pShadowSurface->Release();
+		pShadowSurface = NULL;
+	}
+	// 그리고 깊이 버퍼를 세팅한다.
+	gpD3DDevice->SetDepthStencilSurface(gpShadowDepthStencil);
 
+	//저번 프레임에 그렸던 그림자 정보를 지움
+	// 1. 두번째 인자의 요소 갯수 2. D3DRECT 배열 포인터 3. 플래그 (스텐실, 렌더링, 깊이버퍼) 4. 색감 5. 새로운 z 값 6. 스텐실 버퍼의 비트값
+	gpD3DDevice->Clear(0, NULL, (D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER), 0xFFFFFFFF, 1.0f, 0);
 
-	// 이제 셰이더가 가진 값들을 그릴 물체들에 적용하라고 GPU에게 명령한다.
-	// 모양과 함수들을 잘 보자
+	// 그림자 만들기 셰이더 전역변수들을 설정
+	gpCreateShadowShader->SetMatrix("gWorldMatrix", &matTorusWorld);
+	gpCreateShadowShader->SetMatrix("gLightViewMatrix", &matLightView);
+	gpCreateShadowShader->SetMatrix("gLightProjectionMatrix", &matLightProjection);
+
+	// 그림자 만들기 셰이더 시작
+	{
+		UINT	numPasses = 0;
+		gpCreateShadowShader->Begin(&numPasses, NULL);
+		{
+			for (UINT i = 0; i < numPasses; ++i)
+			{
+				gpCreateShadowShader->BeginPass(i);
+				{
+					// 원환체 를 그린다.
+					gpTorus->DrawSubset(0);
+				}
+				gpCreateShadowShader->EndPass();
+			}
+		}
+		gpCreateShadowShader->End();
+	}
+
+	/* 2. 그림자 입히기 */
+	// 하드웨어 백버퍼/깊이 버퍼를 사용한다.
+	gpD3DDevice->SetRenderTarget(0, pHWBackBuffer);
+	gpD3DDevice->SetDepthStencilSurface(pHWDepthStencilBuffer);
+
+	// 이렇게 메모리를 해제해주는 이유는
+	// GetRenderTarget()이나 GetDepthStencilSuface()를 통해 SURFACE를 얻어올때
+	// D3D가 내부적으로 이 버퍼들의 ref count를 증가시켜준다. 그래서 GPU 메모리 누수가 일어나게 된다. 
+	// (D3D는 ref count를 보고 메모리를 해제해준다.)
+	pHWBackBuffer->Release();
+	pHWBackBuffer = NULL;
+	pHWDepthStencilBuffer->Release();
+	pHWDepthStencilBuffer = NULL;
+
+	// 그림자 입히기 셰이더 전역변수들을 설정
+	// 일번적으로 렌더링에 필요한 월드/뷰/투영 행렬
+	gpApplyShadowShader->SetMatrix("gWorldMatrix", &matTorusWorld); // 원환체
+	gpApplyShadowShader->SetMatrix("gViewProjectionMatrix", &matViewProjection);
+
+	// 광원으로 부터 물체까지의 깊이를 구하기 위한 광원-뷰행렬 / 광원-투영행렬
+	gpApplyShadowShader->SetMatrix("gLightViewMatrix", &matLightView);
+	gpApplyShadowShader->SetMatrix("gLightProjectionMatrix", &matLightProjection);
+
+	// 난반사광 계산을 위한 광원의 위치
+	gpApplyShadowShader->SetVector("gWorldLightPosition", &gWorldLightPosition);
+
+	// 물체의 색
+	gpApplyShadowShader->SetVector("gObjectColor", &gTorusColor);
+
+	// 그림자 맵전달
+	gpApplyShadowShader->SetTexture("ShadowMap_Tex", gpShadowRenderTarget);
+
+	// 셰이더 시작
 	UINT numPasses = 0;
-	gpLightingShader->Begin(&numPasses, NULL); // Begin()과 End() 사이에
+	gpApplyShadowShader->Begin(&numPasses, NULL);
 	{
 		for (UINT i = 0; i < numPasses; ++i)
 		{
-			gpLightingShader->BeginPass(i); // BeginPass()와 EndPass() 가 있고
+			gpApplyShadowShader->BeginPass(i);
 			{
-				// 원환면을 그린다.
-				gpTorus->DrawSubset(0); // 그 사이에 .x를 그리는 DrawSubset()이 있다.
+				// 원환체를 그린다.
+				gpTorus->DrawSubset(0);
+				// 디스크를 그린다.
+				gpApplyShadowShader->SetMatrix("gWorldMatrix", &matDiscWorld);
+				gpApplyShadowShader->SetVector("gObjectColor", &gDiscColor);
+				// BeginPass()와 EndPass()사이에서 변수 값을 바꿔줄 때는
+				gpApplyShadowShader->CommitChanges();// 를 호출해주어야한다.
+				gpDisc->DrawSubset(0);
 			}
-			gpLightingShader->EndPass();
+			gpApplyShadowShader->EndPass();
 		}
 	}
-	gpLightingShader->End();
-	// 이렇게 하면 GPU가 gpColorShader를 이용해서 gpSphere를 그린다.
+	gpApplyShadowShader->End();
+
 }
 
 // 디버그 정보 등을 출력.
