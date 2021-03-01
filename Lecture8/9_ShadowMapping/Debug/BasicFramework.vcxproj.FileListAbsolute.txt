@@ -4,3 +4,7 @@ D:\ShaderPractice\Lecture6\7_EnvironmentMapping\Debug\BasicFramework.pdb
 D:\ShaderPractice\Lecture7\8_UVAnimation\Debug\UVAnimation.cso
 D:\ShaderPractice\Lecture7\8_UVAnimation\Debug\BasicFramework.exe
 D:\ShaderPractice\Lecture7\8_UVAnimation\Debug\BasicFramework.pdb
+D:\ShaderPractice\Lecture8\9_ShadowMapping\Debug\ApplyShadow.cso
+D:\ShaderPractice\Lecture8\9_ShadowMapping\Debug\CreateShadow.cso
+D:\ShaderPractice\Lecture8\9_ShadowMapping\Debug\BasicFramework.exe
+D:\ShaderPractice\Lecture8\9_ShadowMapping\Debug\BasicFramework.pdb

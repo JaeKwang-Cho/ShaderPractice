@@ -2,12 +2,15 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>D:\ShaderPractice\Lecture7\8_UVAnimation\Debug\BasicFramework.exe</FullPath>
+      <FullPath>D:\ShaderPractice\Lecture8\9_ShadowMapping\Debug\BasicFramework.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles>
     <ContentFile>
-      <FullPath>D:\ShaderPractice\Lecture7\8_UVAnimation\Debug\UVAnimation.cso</FullPath>
+      <FullPath>D:\ShaderPractice\Lecture8\9_ShadowMapping\Debug\ApplyShadow.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>D:\ShaderPractice\Lecture8\9_ShadowMapping\Debug\CreateShadow.cso</FullPath>
     </ContentFile>
   </ContentFiles>
   <SatelliteDlls />
