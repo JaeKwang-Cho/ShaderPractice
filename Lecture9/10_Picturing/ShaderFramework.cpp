@@ -35,20 +35,33 @@ ID3DXFont* gpFont = NULL;
 // 모델
 LPD3DXMESH				gpTeapot			= NULL;
 // 쉐이더
-LPD3DXEFFECT			gpEnvironmentMappingShader	= NULL;
+LPD3DXEFFECT			gpEnvironmentMappingShader = NULL;
+LPD3DXEFFECT			gpNoEffect	= NULL;
+LPD3DXEFFECT			gpGrayScale = NULL;
+LPD3DXEFFECT			gpSepia = NULL;
 // 텍스처
 LPDIRECT3DTEXTURE9		gpStoneDM			= NULL;
 LPDIRECT3DTEXTURE9		gpStoneSM			= NULL;
 LPDIRECT3DTEXTURE9		gpStoneNM			= NULL;
 LPDIRECT3DCUBETEXTURE9	gpSnowENV			= NULL;
 
+// 장면 렌더타깃
+LPDIRECT3DTEXTURE9		gpSceneRenderTarget = NULL;
+
+// 화면을 가득 채우는 사각형
+LPDIRECT3DVERTEXDECLARATION9	gpFullscreenQuadDecl = NULL; // 정점 쉐이더로 입력되는 정점의 데이터 정보
+LPDIRECT3DVERTEXBUFFER9			gpFullscreenQuadVB = NULL; // 정점 버퍼 리소스를 조작하는 인터페이스
+LPDIRECT3DINDEXBUFFER9			gpFullscreenQuadIB = NULL; // 인덱스 버퍼 리소스를 조작하는 인터페이스
+
 // 빛의 색상
-D3DXVECTOR4				gLightColor(1.0f, 1.0f, 1.0f,1.0f);
+D3DXVECTOR4				gLightColor(0.7f, 0.7f, 1.0f, 1.0f);
 
 // 프로그램 이름
-const char* gAppName = "Environment Mapping 쉐이더 프레임워크";
+const char* gAppName = "Picturing 쉐이더 프레임워크";
 // 회전값
 float gRotationY = 0.0f;
+// 사용할 포스트프로세스 셰이더의 색인
+int		gPostProcessIndex = 0;
 // 빛의 위치
 D3DXVECTOR4				gWorldLightPosition(500.0f, 500.0f, -500.0f, 1.0f);
 // 카메라 위치
@@ -152,6 +165,11 @@ void ProcessInput(HWND hWnd, WPARAM keyPress)
 		// 윈도우 핸들에게 메시지를 보내는 메크로함수
 		PostMessage(hWnd, WM_DESTROY, 0L, 0L);
 		break;
+	case '1':
+	case '2':
+	case '3':
+		gPostProcessIndex = keyPress - '0' - 1;
+		break;
 	}
 }
 
@@ -197,6 +215,28 @@ void RenderFrame()
 // 3D 물체등을 그린다.
 void RenderScene()
 {
+	/////////////
+	// 1. 장면을 렌더타깃 안에 그린다.
+	/////////////
+
+	// 현재 하드웨어 백버퍼
+	LPDIRECT3DSURFACE9 pHWBackBuffer = NULL;
+	gpD3DDevice->GetRenderTarget(0, &pHWBackBuffer);
+
+	// 렌더타깃 위에 그린다.
+	LPDIRECT3DSURFACE9 pSceneSurface = NULL;
+	if (SUCCEEDED(gpSceneRenderTarget->GetSurfaceLevel(0, &pSceneSurface)))
+	{
+		gpD3DDevice->SetRenderTarget(0, pSceneSurface);
+		pSceneSurface->Release();
+		pSceneSurface = NULL;
+	}
+	// 깊이 버퍼를 따로 사용하지 않는 이유는 렌더타깃의 크기가 하드웨어 깊이 버퍼의 크기와 동일하기 때문
+
+	// 저번 프레임에 그렸던 장면을 지운다.
+	gpD3DDevice->Clear(0, NULL, D3DCLEAR_TARGET, 0xFF000000, 1.0f, 0);
+	// 이렇게 하면 모든 렌더링 결과가 렌더타깃 안에 들어간다.
+
 	// 뷰 행렬을 만든다.
 	D3DXMATRIXA16 matView;
 	D3DXVECTOR3 vEyePt(gWorldCameraPosition.x, gWorldCameraPosition.y, gWorldCameraPosition.z);	// 카메라의 위치 벡터
@@ -260,6 +300,61 @@ void RenderScene()
 	}
 	gpEnvironmentMappingShader->End();
 	// 이렇게 하면 GPU가 gpColorShader를 이용해서 gpSphere를 그린다.
+
+	///////////////
+	//2. 포스트 프로세싱을 적용한다.
+	///////////////
+
+	// 하드웨어 백버퍼를 다시 사용한다.
+	gpD3DDevice->SetRenderTarget(0, pHWBackBuffer);
+	pHWBackBuffer->Release();
+	pHWBackBuffer = NULL;
+
+	// 사용할 포스틒로세스 효과
+	LPD3DXEFFECT effectToUse = gpNoEffect;
+	if (gPostProcessIndex == 1)
+	{
+		effectToUse = gpGrayScale;
+	}
+	else if (gPostProcessIndex == 2)
+	{
+		effectToUse = gpSepia;
+	}
+	// 텍스쳐를 설정하고
+	// pass를 시작한다.
+	effectToUse->SetTexture("SceneTexture_Tex", gpSceneRenderTarget);
+	effectToUse->Begin(&numPasses, NULL);
+	{
+		for (UINT i = 0; i < numPasses; ++i)
+		{
+			// 화면 가득 사각형을 그린다.
+			effectToUse->BeginPass(i);
+			{
+				// 우리가 그릴 사각형은 D3DXMESH가 아니여서
+				// DrawSubet() 함수가 하는일을 직접 해주어야 한다.
+				// 1) 정점 버퍼를 D3D에 세팅한다.
+				// 2) 정점 버퍼 선언을 D3D에 설정하여 정점 포맷을 알려준다.
+				// 3) 인덱스 버퍼를 D3D 장치에 설정한다.
+				// 4) 그리기 함수를 호출한다.
+
+				gpD3DDevice->SetStreamSource(0, gpFullscreenQuadVB, 0, sizeof(float) * 5);
+				// 인덱스 버퍼와 정점선언을 설정
+				gpD3DDevice->SetIndices(gpFullscreenQuadIB);
+				gpD3DDevice->SetVertexDeclaration(gpFullscreenQuadDecl);
+
+				// 마지막으로 그리기 함수
+				// 1) 색인 데이터를 삼각형리스트로 처리하는 이넘
+				// 2) 첫번째 정점주터 그린다.
+				// 3) 최소 색인은 0
+				// 4) 총 6개의 정점
+				// 5) 첫번째 색인 부터 사용
+				// 6) 총 2개의 삼각형을 그린다.
+				gpD3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 6, 0, 2);
+			}
+			effectToUse->EndPass();
+		}
+	}
+	effectToUse->End();
 }
 
 // 디버그 정보 등을 출력.
@@ -276,7 +371,7 @@ void RenderInfo()
 	rct.bottom = WIN_HEIGHT / 3;
 
 	// 키 입력 정보를 출력
-	gpFont->DrawText(NULL, "데모 프레임워크\n\nESC: 데모종료", -1, &rct, 0, fontColor);
+	gpFont->DrawText(NULL, "데모 프레임워크\n\nESC: 데모종료\n1: 칼라\n2: 흑백\n3: 세피아", -1, &rct, 0, fontColor);
 }
 
 //------------------------------------------------------------
@@ -286,6 +381,16 @@ bool InitEverything(HWND hWnd)
 {
 	// D3D를 초기화
 	if (!InitD3D(hWnd))
+	{
+		return false;
+	}
+	// 화면을 가득 채우는 사각형을 하나 만든다.
+	InitFullScreenQuad();
+	
+	// 렌더타깃을 만든다.
+	if (FAILED(gpD3DDevice->CreateTexture(WIN_WIDTH, WIN_HEIGHT,
+		1, D3DUSAGE_RENDERTARGET, D3DFMT_X8R8G8B8,
+		D3DPOOL_DEFAULT, &gpSceneRenderTarget, NULL)))
 	{
 		return false;
 	}
@@ -318,6 +423,7 @@ bool InitD3D(HWND hWnd)
 	{
 		return false;
 	}
+
 
 	// D3D장치를 생성하는데 필요한 구조체를 채워넣는다.
 	D3DPRESENT_PARAMETERS d3dpp;
@@ -358,36 +464,59 @@ bool LoadAssets()
 	{
 		return false;
 	}
+
 	gpStoneSM = LoadTexture("fieldstone_SM.tga");
 	if (!gpStoneSM)
 	{
 		return false;
 	}
+
 	gpStoneNM = LoadTexture("fieldstone_NM.tga");
-	if (!gpStoneSM)
+	if (!gpStoneNM)
 	{
 		return false;
 	}
+
 	D3DXCreateCubeTextureFromFile(gpD3DDevice, "Snow_ENV.dds", &gpSnowENV);
 	if (!gpSnowENV)
 	{
 		return false;
 	}
+
 	// 쉐이더 로딩
 	gpEnvironmentMappingShader = LoadShader("EnvironmentMapping.fx");
 	if (!gpEnvironmentMappingShader)
 	{
 		return false;
 	}
+
+	gpNoEffect = LoadShader("NoEffect.fx");
+	if (!gpNoEffect)
+	{
+		return false;
+	}
+
+	gpGrayScale = LoadShader("Grayscale.fx");
+	if (!gpGrayScale)
+	{
+		return false;
+	}
+
+	gpSepia = LoadShader("Sepia.fx");
+	if (!gpSepia)
+	{
+		return false;
+	}
+
 	// 모델 로딩
 	gpTeapot = LoadModel("TeapotWithTangent.x");
 	if (!gpTeapot)
 	{
 		return false;
 	}
+
 	return true;
 }
-
 // 쉐이더 로딩
 // .fx 포멧으로 저장된 셰이더 파일
 // 정점셰이더와 픽셀셰이더를 모두 포함하고 있는 텍스트 파일이다.
@@ -483,33 +612,83 @@ void Cleanup()
 		gpTeapot->Release();
 		gpTeapot = NULL;
 	}
+
 	// 쉐이더를 release 한다.
 	if (gpEnvironmentMappingShader)
 	{
 		gpEnvironmentMappingShader->Release();
 		gpEnvironmentMappingShader = NULL;
 	}
+
+	if (gpNoEffect)
+	{
+		gpNoEffect->Release();
+		gpNoEffect = NULL;
+	}
+
+	if (gpGrayScale)
+	{
+		gpGrayScale->Release();
+		gpGrayScale = NULL;
+	}
+
+	if (gpSepia)
+	{
+		gpSepia->Release();
+		gpSepia = NULL;
+	}
+
 	// 텍스처를 release 한다.
 	if (gpStoneDM)
 	{
 		gpStoneDM->Release();
 		gpStoneDM = NULL;
 	}
+
 	if (gpStoneSM)
 	{
 		gpStoneSM->Release();
 		gpStoneSM = NULL;
 	}
+
 	if (gpStoneNM)
 	{
 		gpStoneNM->Release();
 		gpStoneNM = NULL;
 	}
+
 	if (gpSnowENV)
 	{
 		gpSnowENV->Release();
 		gpSnowENV = NULL;
 	}
+
+	// 화면크기 사각형을 해제한다
+	if (gpFullscreenQuadDecl)
+	{
+		gpFullscreenQuadDecl->Release();
+		gpFullscreenQuadDecl = NULL;
+	}
+
+	if (gpFullscreenQuadVB)
+	{
+		gpFullscreenQuadVB->Release();
+		gpFullscreenQuadVB = NULL;
+	}
+
+	if (gpFullscreenQuadIB)
+	{
+		gpFullscreenQuadIB->Release();
+		gpFullscreenQuadIB = NULL;
+	}
+
+	//렌더타깃을 해제한다
+	if (gpSceneRenderTarget)
+	{
+		gpSceneRenderTarget->Release();
+		gpSceneRenderTarget = NULL;
+	}
+
 	// D3D를 release 한다.
 	if (gpD3DDevice)
 	{
@@ -524,3 +703,101 @@ void Cleanup()
 	}
 }
 
+void InitFullScreenQuad()
+{
+	// 정점 선언을 만든다.
+	D3DVERTEXELEMENT9 vtxDesc[3]; // 정점 정보를 가진 구조체
+
+	// 첫번째 요소인 위치를 선언
+	int offset = 0;
+	int i = 0;
+
+	// 위치
+	vtxDesc[i].Stream = 0; // D3D 장치에 정점 버퍼들이 동시에 여러개 넣을 수 있는데, 그때 슬롯의 인덱스이다.
+	vtxDesc[i].Offset = offset; // 정점정보가 시작하는 메모리 위치에서 현재 요소가 시작하는 곳까지의 오프셋 값입니다. 
+	vtxDesc[i].Type = D3DDECLTYPE_FLOAT3; // 데이터 형입니다. 정점 정보이기에 float3
+	vtxDesc[i].Method = D3DDECLMETHOD_DEFAULT; // 궁금하면 찾아보자. 보통 이거쓴다.
+	vtxDesc[i].Usage = D3DDECLUSAGE_POSITION; // 용도를 지정한다.
+	vtxDesc[i].UsageIndex = 0; // 시멘틱 인덱스 (그 뒤에 붙였던 숫자를 말한다.)
+
+	// 두번째 요소인 UV 좌표를 선언
+	offset += sizeof(float) * 3;
+	++i;
+
+	// UV 좌표 0
+	vtxDesc[i].Stream = 0;
+	vtxDesc[i].Offset = offset;
+	vtxDesc[i].Type = D3DDECLTYPE_FLOAT2; // UV 좌표이므로 float2
+	vtxDesc[i].Method = D3DDECLMETHOD_DEFAULT;
+	vtxDesc[i].Usage = D3DDECLUSAGE_TEXCOORD; // UV 좌표이므로 TEXCOORD
+	vtxDesc[i].UsageIndex = 0;
+
+	// 모든 정점 요소들을 다 더했다는 표시
+	offset += sizeof(float) * 2;
+	++i;
+
+	// 정점포맷의 끝임을 표현 (D3DDECL_END())
+	vtxDesc[i].Stream = 0xFF;
+	vtxDesc[i].Offset = 0;
+	vtxDesc[i].Type = D3DDECLTYPE_UNUSED;
+	vtxDesc[i].Method = 0;
+	vtxDesc[i].Usage = 0;
+	vtxDesc[i].UsageIndex = 0;
+
+	//이제 이 배열을 가지고, D3D 장치에 정점 선언을 만들자
+	gpD3DDevice->CreateVertexDeclaration(vtxDesc, &gpFullscreenQuadDecl);
+	// 만든 정점 선언은, 나중에 mesh를 그릴때 D3D에게 정점버퍼의 포맷에 맞춰서 올바른 데이터를 뽑아가도록 하는데에 쓰인다.
+
+	// 정점 버퍼를 만든다.
+	// 1) 정점 버퍼의 크기, 위에서 한 정점에 들어가는 바이트 수가 있고, 4각 형을 만들 것이기 때문에 4를 곱해준다.
+	// 2) 특별한 용도로 사용하지 않는다.
+	// 3) FVF(flexible vertex format)를 설정하는 곳이다.
+	// 4) D3D가 알아서 관리해주는 메모리 풀을 사용한다.
+	// 5) 저장용 포인터
+	// 6) 언제나 NULL
+	gpD3DDevice->CreateVertexBuffer(offset * 4, 0, 0, D3DPOOL_MANAGED, &gpFullscreenQuadVB, NULL);
+
+	// 정점 버퍼에 내용을 채워 넣는다.
+	void* vertexData = NULL;
+	// 인덱스 데이터의 범위를 잠그어, 인덱스 버퍼 메모리의 포인터를 얻어온다.
+	gpFullscreenQuadVB->Lock(0, 0, &vertexData, 0);
+	{
+		// 메모리에 정점 정보를 차례대로 써넣는다.
+		float* data = (float*)vertexData;
+		*data++ = -1.0f;	*data++ = 1.0f;		*data++ = 0.0f; // 정점
+		*data++ = 0.0f;		*data++ = 0.0f;						// UV
+
+		*data++ = 1.0f;		*data++ = 1.0f;		*data++ = 0.0f;
+		*data++ = 1.0f;		*data++ = 0;
+
+		*data++ = 1.0f;		*data++ = -1.0f;	*data++ = 0.0f;
+		*data++ = 1.0f;		*data++ = 1.0f;
+
+		*data++ = -1.0f;	*data++ = -1.0f;	*data++ = 0.0f;
+		*data++ = 0.0f;		*data++ = 1.0f;
+	}
+	gpFullscreenQuadVB->Unlock(); // 락을 풀어준다
+
+	// 인덱스 버퍼를 만들어준다
+	// 1) 색인 버퍼의 크기 일단 16비트 6개를 쓰겠다.
+	// 2) 특별한 용도로 사용하지 않는다.
+	// 3) 각 색인이 16비트임을 명시
+	// 4) D3D가 알아서 관리해주는 메모리 풀 사용
+	// 5) 저장포인터
+	// 6) 항상 널
+	gpD3DDevice->CreateIndexBuffer(sizeof(short) * 6, 0, D3DFMT_INDEX16,
+		D3DPOOL_MANAGED, &gpFullscreenQuadIB, NULL);
+
+	// 비슷한 방법으로 인덱스 버퍼에 데이터를 넣자.
+	void* indexData = NULL;
+	gpFullscreenQuadIB->Lock(0, 0, &indexData, 0);
+	{
+		unsigned short* data = (unsigned short*)indexData;
+		// 시계방향으로 삼각형을 2개 만들어준다.
+		*data++ = 0;	*data++ = 1;	*data++ = 3;
+		*data++ = 3;	*data++ = 1;	*data++ = 2;
+	}
+	gpFullscreenQuadIB->Unlock();
+
+	// 이러면 끝이다.
+}

@@ -45,3 +45,6 @@ void RenderInfo();
 
 // 뒷정리 관련
 void Cleanup();
+
+//	필터 관련
+void InitFullScreenQuad();
