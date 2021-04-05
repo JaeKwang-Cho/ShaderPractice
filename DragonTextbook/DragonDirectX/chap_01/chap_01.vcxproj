@@ -68,6 +68,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="d3_init.cpp" />
+    <ClCompile Include="d3_main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3_init.h" />
