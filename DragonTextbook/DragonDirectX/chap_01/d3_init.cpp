@@ -4,7 +4,7 @@
 LPDIRECT3D9             gpD3D = NULL;				// D3D
 LPDIRECT3DDEVICE9       gpD3DDevice = NULL;				// D3D 장치
 
-const char* gAppName = "컬러 쉐이더 프레임워크";
+const char* gAppName = "베이스 코드";
 
 //-----------------------------------------------------------------------
 // 프로그램 진입점/메시지 루프
@@ -19,7 +19,7 @@ INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, INT)
 	// 6) 핸들러 7) 아이콘 리소스 포인터 8) 커서 리소스 포인터 9) 브러쉬 핸들 10) 메뉴 이름 포인터
 	// 11) 클래스 이름 포인터 12) 아이콘 포인터
 	// 뭐... 정 하나하나가 궁금하면 찾아보자
-	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, MsgProc, 0L, 0L,
+	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L,
 					  GetModuleHandle(NULL), NULL, NULL, NULL, NULL,
 					  gAppName, NULL };
 	RegisterClassEx(&wc);
@@ -75,7 +75,7 @@ INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, INT)
 }
 
 // 메시지 처리기
-LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	switch (msg)
 	{
@@ -112,7 +112,14 @@ bool InitEverything(HWND hWnd)
 {
 	// D3D를 초기화
 	if (!InitD3D(hWnd))
+	{		
+		::MessageBox(0, "InitD3D() - FAILED", 0, 0);
+			
+		return false;
+	}
+	if (!Setup())
 	{
+		::MessageBox(0, "Setup() - FAILED", 0, 0);
 		return false;
 	}
 	return true;
@@ -171,6 +178,9 @@ bool InitD3D(HWND hWnd)
 	// 게임에서는 성능상 모니터의 수직 동기를 기다리지 않고 곧바로 스왑해 주는 경우가 많다.(D3DPRESENT IMMEDIATE) 단, 이럴 때는 전 프레임과 현재 프레임이 서로 찢겨보이는 부작용이 있다.
 
 	// 위 정보(D3DPRESENT_PARAMETERS 구조체)를 가지고 D3D장치를 생성한다.
+	// 1. 물리 디스플레이 어뎁터	2.이용할 장치 타입 설정 3. 윈도우 핸들, 보통 장치가 드로잉을 수행할 윈도우
+	// 4. 하드웨어 혹은 소프트웨어 프로세싱 5. 장치 특성의 일부를 정의하는 초기화된 인스턴스
+	// 6. 생성된 장치 리턴
 	if (FAILED(gpD3D->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd,
 		D3DCREATE_HARDWARE_VERTEXPROCESSING,
 		&d3dpp, &gpD3DDevice)))
@@ -178,6 +188,11 @@ bool InitD3D(HWND hWnd)
 		return false;
 	}
 
+	return true;
+
+}
+bool Setup()
+{
 	return true;
 }
 
@@ -195,4 +210,31 @@ void Cleanup()
 		gpD3D->Release();
 		gpD3D = NULL;
 	}
+}
+
+int EnterMsgLoop(bool (*ptr_display)(float timeDelta))
+{
+	MSG msg;
+	::ZeroMemory(&msg, sizeof(MSG));
+
+	static float lastTime = (float)timeGetTime();
+
+	while (msg.message != WM_QUIT)
+	{
+		if (::PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+		{
+			::TranslateMessage(&msg);
+			::DispatchMessage(&msg);
+		}
+		else
+		{
+			float currTime = (float)timeGetTime();
+			float timeDelta = (currTime - lastTime) * 0.001f;
+
+			ptr_display(timeDelta);
+
+			lastTime = currTime;
+		}
+	}
+	return msg.wParam;
 }
