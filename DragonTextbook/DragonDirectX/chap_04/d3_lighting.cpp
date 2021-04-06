@@ -1,8 +1,70 @@
-#include "d3_init.h"
+#include "d3_lighting.h"
 
 // D3D 관련
 extern LPDIRECT3D9             gpD3D;				// D3D
 extern LPDIRECT3DDEVICE9       gpD3DDevice;				// D3D 장치
+
+// 법선 벡터추가
+const DWORD Vertex::FVF = D3DFVF_XYZ | D3DFVF_NORMAL;
+
+// 피라미드 버퍼 추가
+IDirect3DVertexBuffer9* Pyramid = NULL;
+
+
+D3DMATERIAL9 d3light::InitMtrl(D3DXCOLOR ambient, D3DXCOLOR diffuse, D3DXCOLOR specular, D3DXCOLOR emissive, float power)
+{
+	D3DMATERIAL9 mtrl;
+
+	mtrl.Ambient = ambient;
+	mtrl.Diffuse = diffuse;
+	mtrl.Specular = specular;
+	mtrl.Emissive = emissive;
+	mtrl.Power = power;
+
+	return mtrl;
+}
+D3DLIGHT9 d3light::InitDirectionalLight(D3DXVECTOR3* direction, D3DXCOLOR* color)
+{
+	D3DLIGHT9 light;
+	::ZeroMemory(&light, sizeof(light));
+
+	light.Type = D3DLIGHT_DIRECTIONAL; 
+	light.Ambient = *color * 0.4f;
+	light.Diffuse = *color;
+	light.Specular = *color * 0.6f;
+	light.Direction = *direction;
+
+	return light;
+}
+D3DLIGHT9 d3light::InitPointLight(D3DXVECTOR3* position, D3DXCOLOR* color)
+{
+	D3DLIGHT9 light;
+	::ZeroMemory(&light, sizeof(light));
+
+	light.Type = D3DLIGHT_POINT;
+	light.Ambient = *color * 0.4f;
+	light.Diffuse = *color;
+	light.Specular = *color * 0.6f;
+	light.Position = *position;
+
+	return light;
+}
+D3DLIGHT9 d3light::InitSpotLight(D3DXVECTOR3* position, D3DXVECTOR3* direction, D3DXCOLOR* color)
+{
+	D3DLIGHT9 light;
+	::ZeroMemory(&light, sizeof(light));
+
+	light.Type = D3DLIGHT_SPOT;
+	light.Ambient = *color * 0.4f;
+	light.Diffuse = *color;
+	light.Specular = *color * 0.6f;
+	light.Direction = *direction;
+	light.Position = *position;
+
+	return light;
+}
+
+
 
 //------------------------------------------------------------
 // 초기화 코드
@@ -23,8 +85,147 @@ bool InitEverything(HWND hWnd)
 	}
 	return true;
 }
+bool Setup()
+{
+	gpD3DDevice->SetRenderState(D3DRS_LIGHTING, true);
 
-// D3D 객체 및 장치 초기화
+	gpD3DDevice->CreateVertexBuffer(
+		12 * sizeof(Vertex),
+		D3DUSAGE_WRITEONLY,
+		Vertex::FVF,
+		D3DPOOL_MANAGED,
+		&Pyramid,
+		NULL
+	);
+
+	// 피라미드 데이터로 버텍스 버퍼를 채운다.
+	Vertex* v;
+	Pyramid->Lock(0, 0, (void**)&v, 0);
+
+	// 정면
+	v[0] = Vertex(-1.0f, 0.0f, -1.0f, 0.0f, 0.707f, -0.707f);
+	v[1] = Vertex(0.0f, 1.0f, 0.0f, 0.0f, 0.707f, -0.707f);
+	v[2] = Vertex(1.0f, 0.0f, -1.0f, 0.0f, 0.707f, -0.707f);
+
+	// 왼쪽 측면
+	v[3] = Vertex(-1.0f, 0.0f, 1.0f, -0.707f, 0.707f, 0.0f);
+	v[4] = Vertex(0.0f, 1.0f, 0.0f, -0.707f, 0.707f, 0.0f);
+	v[5] = Vertex(-1.0f, 0.0f, -1.0f, -0.707f, 0.707f, 0.0f);
+
+	// 오른쪽 측면
+	v[6] = Vertex(1.0f, 0.0f, -1.0f, 0.707f, 0.707f, 0.0f);
+	v[7] = Vertex(0.0f, 1.0f, 0.0f, 0.707f, 0.707f, 0.0f);
+	v[8] = Vertex(1.0f, 0.0f, 1.0f, 0.707f, 0.707f, 0.0f);
+
+	// 후면
+	v[9] = Vertex(1.0f, 0.0f, 1.0f, 0.0f, 0.707f, 0.707f);
+	v[10] = Vertex(0.0f, 1.0f, 0.0f, 0.0f, 0.707f, 0.707f);
+	v[11] = Vertex(-1.0f, 0.0f, 1.0f, 0.0f, 0.707f, 0.707f);
+
+
+
+	Pyramid->Unlock();
+
+	// 재질
+	D3DMATERIAL9 mtrl;
+	mtrl.Ambient = d3light::WHITE;
+	mtrl.Diffuse = d3light::RED;
+	mtrl.Specular = d3light::WHITE;
+	mtrl.Emissive = d3light::BLACK;
+	mtrl.Power = 5.0f;
+
+	gpD3DDevice->SetMaterial(&mtrl);
+
+	// 광원 설정
+	D3DLIGHT9 dir;
+	::ZeroMemory(&dir, sizeof(dir));
+	dir.Type = D3DLIGHT_DIRECTIONAL;
+	dir.Diffuse = d3light::WHITE;
+	dir.Specular = d3light::WHITE * 0.3f;
+	dir.Ambient = d3light::WHITE * 0.6f;
+	dir.Direction = D3DXVECTOR3(1.0f, 0.0f, 0.0f);
+
+	gpD3DDevice->SetLight(0, &dir);
+	gpD3DDevice->LightEnable(0, true);
+
+	// 법선 정리
+	gpD3DDevice->SetRenderState(D3DRS_NORMALIZENORMALS, true);
+	gpD3DDevice->SetRenderState(D3DRS_SPECULARENABLE, true);
+
+	// 뷰 행렬
+	// 카메라의 위치와 방향을 조정한다.
+	D3DXVECTOR3 pos(0.0f, 1.0f, -3.0f);
+	D3DXVECTOR3 target(0.0f, 0.0f, 0.0f);
+	D3DXVECTOR3 up(0.0f, 1.0f, 0.0f);
+	D3DXMATRIX V;
+	D3DXMatrixLookAtLH(&V, &pos, &target, &up);
+
+	gpD3DDevice->SetTransform(D3DTS_VIEW, &V);
+
+	// 투영 매트릭스를 지정한다.
+	D3DXMATRIX proj;
+	D3DXMatrixPerspectiveFovLH(
+		&proj,
+		D3DX_PI * 0.5f, // 90 - degree
+		(float)WIN_WIDTH / (float)WIN_HEIGHT,
+		1.0f,
+		1000.0f);
+
+	gpD3DDevice->SetTransform(D3DTS_PROJECTION, &proj);
+
+	return true;
+}
+
+bool Display(float timeDelta)
+{
+	if (gpD3DDevice)
+	{
+		D3DXMATRIX yRot;
+
+		static float y = 0.0f;
+
+		D3DXMatrixRotationY(&yRot, y);
+		y += timeDelta;
+
+		if (y >= 6.28f)
+			y = 0.0f;
+
+		gpD3DDevice->SetTransform(D3DTS_WORLD, &yRot);
+
+		//
+		// Draw the scene:
+		//
+
+		gpD3DDevice->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0x00000000, 1.0f, 0);
+		gpD3DDevice->BeginScene();
+
+		gpD3DDevice->SetStreamSource(0, Pyramid, 0, sizeof(Vertex));
+		gpD3DDevice->SetFVF(Vertex::FVF);
+		gpD3DDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 4);
+
+		gpD3DDevice->EndScene();
+		gpD3DDevice->Present(0, 0, 0, 0);
+	}
+	return true;
+}
+
+
+void Cleanup()
+{
+	// 마지막으로 D3D를 release 한다.
+	if (gpD3DDevice)
+	{
+		gpD3DDevice->Release();
+		gpD3DDevice = NULL;
+	}
+
+	if (gpD3D)
+	{
+		gpD3D->Release();
+		gpD3D = NULL;
+	}
+}
+
 bool InitD3D(HWND hWnd)
 {
 	// D3D 초기화는 항상 이렇게 시작한다.
@@ -90,24 +291,5 @@ bool InitD3D(HWND hWnd)
 	return true;
 
 }
-bool Setup()
-{
-	return true;
-}
 
-void Cleanup()
-{
-	// 마지막으로 D3D를 release 한다.
-	if (gpD3DDevice)
-	{
-		gpD3DDevice->Release();
-		gpD3DDevice = NULL;
-	}
-
-	if (gpD3D)
-	{
-		gpD3D->Release();
-		gpD3D = NULL;
-	}
-}
 

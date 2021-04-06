@@ -143,8 +143,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="d3_color.cpp" />
     <ClCompile Include="d3_init.cpp" />
+    <ClCompile Include="d3_color.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3_color.h" />

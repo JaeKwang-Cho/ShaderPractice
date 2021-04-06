@@ -1,179 +1,196 @@
 #include "d3_draw.h"
 
-// D3D 관련
-LPDIRECT3D9             gpD3D = NULL;				// D3D
-LPDIRECT3DDEVICE9       gpD3DDevice = NULL;				// D3D 장치
+extern LPDIRECT3D9             gpD3D;				// D3D
+extern LPDIRECT3DDEVICE9       gpD3DDevice;			// D3D 장치
 
-// 입방체 버텍스, 인덱스 
-IDirect3DVertexBuffer9* VB = NULL;
-IDirect3DIndexBuffer9* IB = NULL;
+extern IDirect3DVertexBuffer9* VB;
+extern IDirect3DIndexBuffer9* IB;
+
+const DWORD Vertex::FVF = D3DFVF_XYZ;
 
 
-
-const char* gAppName = "간단한 메쉬 그려보기";
-
-//-----------------------------------------------------------------------
-// 프로그램 진입점/메시지 루프
-//-----------------------------------------------------------------------
-
-// 진입점
-INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, INT)
+//------------------------------------------------------------
+// 초기화 코드
+//------------------------------------------------------------
+bool InitEverything(HWND hWnd)
 {
-	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L,
-					  GetModuleHandle(NULL), NULL, NULL, NULL, NULL,
-					  gAppName, NULL };
-	RegisterClassEx(&wc);
 
-	DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
-	HWND hWnd = CreateWindow(gAppName, gAppName,
-		style, CW_USEDEFAULT, 0, WIN_WIDTH, WIN_HEIGHT,
-		GetDesktopWindow(), NULL, wc.hInstance, NULL);
-	POINT ptDiff;
-	RECT rcClient, rcWindow;
-
-	GetClientRect(hWnd, &rcClient);
-	GetWindowRect(hWnd, &rcWindow);
-
-	ptDiff.x = (rcWindow.right - rcWindow.left) - rcClient.right;
-	ptDiff.y = (rcWindow.bottom - rcWindow.top) - rcClient.bottom;
-	
-	MoveWindow(hWnd, rcWindow.left, rcWindow.top, WIN_WIDTH + ptDiff.x, WIN_HEIGHT + ptDiff.y, TRUE);
-
-	ShowWindow(hWnd, SW_SHOWDEFAULT);
-	UpdateWindow(hWnd);
-
-
-	if (!InitEverything(hWnd))
-		PostQuitMessage(1);
-
-	MSG msg;
-	ZeroMemory(&msg, sizeof(msg));
-
-	static float lastTime = (float)timeGetTime();
-	while (msg.message != WM_QUIT)
+	if (!InitD3D(hWnd))
 	{
-		if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-		else 
-		{
-			float currTime = (float)timeGetTime();
-			float timeDelta = (currTime - lastTime) * 0.001f;
+		::MessageBox(0, "InitD3D() - FAILED", 0, 0);
 
-			Display(timeDelta);
-
-			lastTime = currTime;
-		}
+		return false;
 	}
-	
-	UnregisterClass(gAppName, wc.hInstance);
-	return 0;
-}
-
-// 메시지 처리기
-LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-	switch (msg)
+	if (!Setup())
 	{
-	case WM_KEYDOWN:
-		ProcessInput(hWnd, wParam);
-		break;
-
-	case WM_DESTROY:
-		Cleanup();
-		PostQuitMessage(0);
-		return 0;
-	}
-	// 처리하지 않는 메시지를 default 기본 처리
-	return DefWindowProc(hWnd, msg, wParam, lParam);
-}
-
-// 키보드 입력처리
-void ProcessInput(HWND hWnd, WPARAM keyPress)
-{
-	switch (keyPress)
-	{
-		// ESC 키가 눌리면 프로그램을 종료한다.
-	case VK_ESCAPE:
-		// 윈도우 핸들에게 메시지를 보내는 메크로함수
-		PostMessage(hWnd, WM_DESTROY, 0L, 0L);
-		break;
-	}
-}
-
-bool Display(float timeDelta)
-{
-	if (gpD3DDevice)
-	{
-		// 입방체를 회전 시킨다.
-		D3DXMATRIX Rx, Ry;
-
-		// x 축으로 45도 회전 시킨다.
-		D3DXMatrixRotationX(&Rx, 3.14f / 4.0f);
-
-		// 각 프레임당 y 회전을 증가시킨다.
-		static float y = 0.0f;
-		D3DXMatrixRotationY(&Ry, y);
-		y += timeDelta;
-
-		// 각도가 2*PI에 이르면 0으로 초기화 한다.
-		if (y >= 6.28f)
-		{
-			y = 0.0f;
-		}
-		// 회전을 결합한다.
-		D3DXMATRIX p = Rx * Ry;
-
-		gpD3DDevice->SetTransform(D3DTS_WORLD, &p);
-
-		// 장면을 그린다.
-		gpD3DDevice->Clear(0, 0,
-			D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER,
-			0xffffffff, 1.0f, 0);
-		gpD3DDevice->BeginScene();
-
-		gpD3DDevice->SetStreamSource(0, VB, 0, sizeof(Vertex));
-		gpD3DDevice->SetIndices(IB);
-		gpD3DDevice->SetFVF(Vertex::FVF);
-		gpD3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
-			0, 0, 8, 0, 12);
-		// 1. 기본도형 2.인덱스 버퍼 시작 지점 3.	정점 버퍼 시작 지점 4. 정점의 수
-		//  5. 인덱스 시작할때 정점이 시작하는 위치 6. 기본 도형의 수
-
-
-		gpD3DDevice->EndScene();
-		gpD3DDevice->Present(0, 0, 0, 0);
-
+		::MessageBox(0, "Setup() - FAILED", 0, 0);
+		return false;
 	}
 	return true;
 }
-
-
-int EnterMsgLoop(bool (*ptr_display)(float timeDelta))
+bool Setup()
 {
-	MSG msg;
-	::ZeroMemory(&msg, sizeof(MSG));
+	// 버텍스와 인덱스 버퍼를 만든다.
+	gpD3DDevice->CreateVertexBuffer(
+		8 * sizeof(Vertex),
+		D3DUSAGE_WRITEONLY,
+		Vertex::FVF,
+		D3DPOOL_MANAGED,
+		&VB,
+		0);
 
-	static float lastTime = (float)timeGetTime();
+	gpD3DDevice->CreateIndexBuffer(
+		36 * sizeof(WORD),
+		D3DUSAGE_WRITEONLY,
+		D3DFMT_INDEX16,
+		D3DPOOL_MANAGED,
+		&IB,
+		0);
 
-	while (msg.message != WM_QUIT)
+	// 큐브 데이터로 버퍼를 채운다.
+	Vertex* vertices;
+	VB->Lock(0, 0, (void**)&vertices, 0);
+
+	// 단위 큐브의 버텍스들
+	vertices[0] = Vertex(-1.0f, -1.0f, -1.0f);
+	vertices[1] = Vertex(-1.0f, 1.0f, -1.0f);
+	vertices[2] = Vertex(1.0f, 1.0f, -1.0f);
+	vertices[3] = Vertex(1.0f, -1.0f, -1.0f);
+	vertices[4] = Vertex(-1.0f, -1.0f, 1.0f);
+	vertices[5] = Vertex(-1.0f, 1.0f, 1.0f);
+	vertices[6] = Vertex(1.0f, 1.0f, 1.0f);
+	vertices[7] = Vertex(1.0f, -1.0f, 1.0f);
+
+	VB->Unlock();
+
+	// 입방체의 삼각형들을 정의한다.
+	WORD* indices;
+	IB->Lock(0, 0, (void**)&indices, 0);
+
+	// 전면
+	indices[0] = 0; indices[1] = 1; indices[2] = 2;
+	indices[3] = 0; indices[4] = 2; indices[5] = 3;
+
+	// 후면
+	indices[6] = 4; indices[7] = 6; indices[8] = 5;
+	indices[9] = 4; indices[10] = 7; indices[11] = 6;
+
+	// 좌측
+	indices[12] = 4; indices[13] = 5; indices[14] = 1;
+	indices[15] = 4; indices[16] = 1; indices[17] = 0;
+
+	// 우측
+	indices[18] = 3; indices[19] = 2; indices[20] = 6;
+	indices[21] = 3; indices[22] = 6; indices[23] = 7;
+
+	// 상단
+	indices[24] = 1; indices[25] = 5; indices[26] = 6;
+	indices[27] = 1; indices[28] = 6; indices[29] = 2;
+
+	// 하단
+	indices[30] = 4; indices[31] = 0; indices[32] = 3;
+	indices[33] = 4; indices[34] = 3; indices[35] = 7;
+	
+
+	IB->Unlock();
+
+	// 뷰 행렬
+	// 카메라의 위치와 방향을 조정한다.
+	D3DXVECTOR3 position(0.0f, 0.0f, -5.0f);
+	D3DXVECTOR3 target(0.0f, 0.0f, 0.0f);
+	D3DXVECTOR3 up(0.0f, 1.0f, 0.0f);
+	D3DXMATRIX V;
+	D3DXMatrixLookAtLH(&V, &position, &target, &up);
+
+	gpD3DDevice->SetTransform(D3DTS_VIEW, &V);
+
+	// 투영 행렬을 지정한다.
+	D3DXMATRIX proj;
+	D3DXMatrixPerspectiveFovLH(
+		&proj,
+		D3DX_PI * 0.5f, // 시야각 90도
+		(float)WIN_WIDTH/(float)WIN_HEIGHT,
+		1.0f,
+		1000.0f);
+	gpD3DDevice->SetTransform(D3DTS_PROJECTION, &proj);
+
+	gpD3DDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
+			
+	return true;
+}
+
+void Cleanup()
+{
+	// VB와 IB의 메모리를 해제한다.
+	d3d::Release<IDirect3DVertexBuffer9*>(VB);
+	d3d::Release<IDirect3DIndexBuffer9*>(IB);
+
+	// 마지막으로 D3D를 release 한다.
+	if (gpD3DDevice)
 	{
-		if (::PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
-		{
-			::TranslateMessage(&msg);
-			::DispatchMessage(&msg);
-		}
-		else
-		{
-			float currTime = (float)timeGetTime();
-			float timeDelta = (currTime - lastTime) * 0.001f;
-
-			ptr_display(timeDelta);
-
-			lastTime = currTime;
-		}
+		gpD3DDevice->Release();
+		gpD3DDevice = NULL;
 	}
-	return msg.wParam;
+
+	if (gpD3D)
+	{
+		gpD3D->Release();
+		gpD3D = NULL;
+	}
+}
+
+bool InitD3D(HWND hWnd)
+{
+
+	gpD3D = Direct3DCreate9(D3D_SDK_VERSION);
+
+	if (!gpD3D)
+	{
+		return false;
+	}
+
+	D3DCAPS9 caps;
+	gpD3D->GetDeviceCaps(
+		D3DADAPTER_DEFAULT, 
+		D3DDEVTYPE_HAL,		 
+		&caps				
+	);
+
+	int vp = 0;
+	if (caps.DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT)
+	{
+		vp = D3DCREATE_HARDWARE_VERTEXPROCESSING;
+	}
+	else
+	{
+		vp = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+	}
+
+	D3DPRESENT_PARAMETERS d3dpp;
+	ZeroMemory(&d3dpp, sizeof(d3dpp));
+
+	d3dpp.BackBufferWidth = WIN_WIDTH;
+	d3dpp.BackBufferHeight = WIN_HEIGHT;
+	d3dpp.BackBufferFormat = D3DFMT_X8R8G8B8;
+	d3dpp.BackBufferCount = 1;
+	d3dpp.MultiSampleType = D3DMULTISAMPLE_NONE;
+	d3dpp.MultiSampleQuality = 0;
+	d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
+	d3dpp.hDeviceWindow = hWnd;
+	d3dpp.Windowed = TRUE;
+	d3dpp.EnableAutoDepthStencil = TRUE;
+	d3dpp.AutoDepthStencilFormat = D3DFMT_D24X8;
+	d3dpp.Flags = D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
+	d3dpp.FullScreen_RefreshRateInHz = 0;
+	d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
+
+	if (FAILED(gpD3D->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd,
+		D3DCREATE_HARDWARE_VERTEXPROCESSING,
+		&d3dpp, &gpD3DDevice)))
+	{
+		return false;
+	}
+
+	return true;
+
 }

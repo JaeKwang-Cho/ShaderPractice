@@ -1,165 +1,141 @@
 #include "d3_color.h"
 
-// D3D 관련
-LPDIRECT3D9             gpD3D = NULL;				// D3D
-LPDIRECT3DDEVICE9       gpD3DDevice = NULL;				// D3D 장치
+extern LPDIRECT3D9             gpD3D;				// D3D
+extern LPDIRECT3DDEVICE9       gpD3DDevice;			// D3D 장치
 
-// 월드 변환과 삼각형 버텍스데이터
-D3DXMATRIX				World;
-IDirect3DVertexBuffer9* Triangle = NULL;
+extern IDirect3DVertexBuffer9* Triangle;			// 삼각형 버텍스
 
+const DWORD ColorVertex::FVF = D3DFVF_XYZ|D3DFVF_DIFFUSE;
 
 
-const char* gAppName = "색칠해보기";
 
-//-----------------------------------------------------------------------
-// 프로그램 진입점/메시지 루프
-//-----------------------------------------------------------------------
-
-// 진입점
-INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, INT)
+//------------------------------------------------------------
+// 초기화 코드
+//------------------------------------------------------------
+bool InitEverything(HWND hWnd)
 {
-	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L,
-					  GetModuleHandle(NULL), NULL, NULL, NULL, NULL,
-					  gAppName, NULL };
-	RegisterClassEx(&wc);
 
-	DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
-	HWND hWnd = CreateWindow(gAppName, gAppName,
-		style, CW_USEDEFAULT, 0, WIN_WIDTH, WIN_HEIGHT,
-		GetDesktopWindow(), NULL, wc.hInstance, NULL);
-	POINT ptDiff;
-	RECT rcClient, rcWindow;
-
-	GetClientRect(hWnd, &rcClient);
-	GetWindowRect(hWnd, &rcWindow);
-
-	ptDiff.x = (rcWindow.right - rcWindow.left) - rcClient.right;
-	ptDiff.y = (rcWindow.bottom - rcWindow.top) - rcClient.bottom;
-	
-	MoveWindow(hWnd, rcWindow.left, rcWindow.top, WIN_WIDTH + ptDiff.x, WIN_HEIGHT + ptDiff.y, TRUE);
-
-	ShowWindow(hWnd, SW_SHOWDEFAULT);
-	UpdateWindow(hWnd);
-
-
-	if (!InitEverything(hWnd))
-		PostQuitMessage(1);
-
-	MSG msg;
-	ZeroMemory(&msg, sizeof(msg));
-
-	static float lastTime = (float)timeGetTime();
-	while (msg.message != WM_QUIT)
+	if (!InitD3D(hWnd))
 	{
-		if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-		else 
-		{
-			float currTime = (float)timeGetTime();
-			float timeDelta = (currTime - lastTime) * 0.001f;
+		::MessageBox(0, "InitD3D() - FAILED", 0, 0);
 
-			Display(timeDelta);
-
-			lastTime = currTime;
-		}
+		return false;
 	}
-	
-	UnregisterClass(gAppName, wc.hInstance);
-	return 0;
-}
-
-// 메시지 처리기
-LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-	switch (msg)
+	if (!Setup())
 	{
-	case WM_KEYDOWN:
-		ProcessInput(hWnd, wParam);
-		break;
-
-	case WM_DESTROY:
-		Cleanup();
-		PostQuitMessage(0);
-		return 0;
-	}
-	// 처리하지 않는 메시지를 default 기본 처리
-	return DefWindowProc(hWnd, msg, wParam, lParam);
-}
-
-// 키보드 입력처리
-void ProcessInput(HWND hWnd, WPARAM keyPress)
-{
-	switch (keyPress)
-	{
-		// ESC 키가 눌리면 프로그램을 종료한다.
-	case VK_ESCAPE:
-		// 윈도우 핸들에게 메시지를 보내는 메크로함수
-		PostMessage(hWnd, WM_DESTROY, 0L, 0L);
-		break;
-	}
-}
-
-bool Display(float timeDelta)
-{
-	if (gpD3DDevice)
-	{
-		gpD3DDevice->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER,
-			0xffffffff, 1.0f, 0);
-		gpD3DDevice->BeginScene();
-
-		gpD3DDevice->SetFVF(ColorVertex::FVF);
-		gpD3DDevice->SetStreamSource(0, Triangle, 0, sizeof(ColorVertex));
-
-		// 플랫 셰이딩으로 화면 왼쪽에 삼각형을 그린다.
-		D3DXMatrixTranslation(&World, -1.25f, 0.0f, 0.0f);
-		gpD3DDevice->SetTransform(D3DTS_WORLD, &World);
-
-		gpD3DDevice->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_FLAT);
-		gpD3DDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1);
-
-		// 그라우드 셰이딩으로 화면 오른쪽에 삼각형을 그린다.
-		D3DXMatrixTranslation(&World, 1.25f, 0.0f, 0.0f);
-		gpD3DDevice->SetTransform(D3DTS_WORLD, &World);
-
-		gpD3DDevice->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD);
-		gpD3DDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1);
-
-
-		gpD3DDevice->EndScene();
-		gpD3DDevice->Present(0, 0, 0, 0);
-
+		::MessageBox(0, "Setup() - FAILED", 0, 0);
+		return false;
 	}
 	return true;
 }
-
-
-int EnterMsgLoop(bool (*ptr_display)(float timeDelta))
+bool Setup()
 {
-	MSG msg;
-	::ZeroMemory(&msg, sizeof(MSG));
+	// 버텍스 버퍼를 만든다.
+	gpD3DDevice->CreateVertexBuffer(
+		3 * sizeof(ColorVertex),
+		D3DUSAGE_WRITEONLY,
+		ColorVertex::FVF,
+		D3DPOOL_MANAGED,
+		&Triangle, NULL
+	);
 
-	static float lastTime = (float)timeGetTime();
+	// 삼각형 데이터로 버퍼를 채운다.
+	ColorVertex* v;
+	Triangle->Lock(0, 0, (void**)&v, 0);
 
-	while (msg.message != WM_QUIT)
+	v[0] = ColorVertex(-1.0f, 0.0f, 2.0f, D3DCOLOR_XRGB(255, 0, 0));
+	v[1] = ColorVertex(0.0f, 1.0f, 2.0f, D3DCOLOR_XRGB(0, 255, 0));
+	v[2] = ColorVertex(1.0f, 0.0f, 2.0f, D3DCOLOR_XRGB(0, 0, 255));
+
+	Triangle->Unlock();
+
+	// 투영 매트릭스를 지정한다.
+	D3DXMATRIX proj;
+	D3DXMatrixPerspectiveFovLH(
+		&proj,
+		D3DX_PI * 0.5f, // 시야각 90도
+		(float)WIN_WIDTH / (float)WIN_HEIGHT,
+		1.0f,
+		1000.0f);
+	
+	gpD3DDevice->SetTransform(D3DTS_PROJECTION, &proj);
+
+	// 렌더 상태를 지정한다.
+	gpD3DDevice->SetRenderState(D3DRS_LIGHTING, false);
+
+
+	return true;
+}
+
+void Cleanup()
+{
+
+	// 마지막으로 D3D를 release 한다.
+	if (gpD3DDevice)
 	{
-		if (::PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
-		{
-			::TranslateMessage(&msg);
-			::DispatchMessage(&msg);
-		}
-		else
-		{
-			float currTime = (float)timeGetTime();
-			float timeDelta = (currTime - lastTime) * 0.001f;
-
-			ptr_display(timeDelta);
-
-			lastTime = currTime;
-		}
+		gpD3DDevice->Release();
+		gpD3DDevice = NULL;
 	}
-	return msg.wParam;
+
+	if (gpD3D)
+	{
+		gpD3D->Release();
+		gpD3D = NULL;
+	}
+}
+
+bool InitD3D(HWND hWnd)
+{
+
+	gpD3D = Direct3DCreate9(D3D_SDK_VERSION);
+
+	if (!gpD3D)
+	{
+		return false;
+	}
+
+	D3DCAPS9 caps;
+	gpD3D->GetDeviceCaps(
+		D3DADAPTER_DEFAULT, 
+		D3DDEVTYPE_HAL,		 
+		&caps				
+	);
+
+	int vp = 0;
+	if (caps.DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT)
+	{
+		vp = D3DCREATE_HARDWARE_VERTEXPROCESSING;
+	}
+	else
+	{
+		vp = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+	}
+
+	D3DPRESENT_PARAMETERS d3dpp;
+	ZeroMemory(&d3dpp, sizeof(d3dpp));
+
+	d3dpp.BackBufferWidth = WIN_WIDTH;
+	d3dpp.BackBufferHeight = WIN_HEIGHT;
+	d3dpp.BackBufferFormat = D3DFMT_X8R8G8B8;
+	d3dpp.BackBufferCount = 1;
+	d3dpp.MultiSampleType = D3DMULTISAMPLE_NONE;
+	d3dpp.MultiSampleQuality = 0;
+	d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
+	d3dpp.hDeviceWindow = hWnd;
+	d3dpp.Windowed = TRUE;
+	d3dpp.EnableAutoDepthStencil = TRUE;
+	d3dpp.AutoDepthStencilFormat = D3DFMT_D24X8;
+	d3dpp.Flags = D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
+	d3dpp.FullScreen_RefreshRateInHz = 0;
+	d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
+
+	if (FAILED(gpD3D->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd,
+		D3DCREATE_HARDWARE_VERTEXPROCESSING,
+		&d3dpp, &gpD3DDevice)))
+	{
+		return false;
+	}
+
+	return true;
+
 }
