@@ -248,16 +248,13 @@ bool InitD3D(HWND hWnd)
 	int vp = 0;
 	if (caps.DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT)
 	{
-		// 하드웨어 버텍스 프로세싱이 지원된다.
 		vp = D3DCREATE_HARDWARE_VERTEXPROCESSING;
 	}
 	else
 	{
-		// 소프트웨어 버텍스 프로세싱을 이용해야 한다.
 		vp = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
 	}
 
-	// D3Device9을 초기화하는데 필요한 구조체를 채워넣는다.
 	D3DPRESENT_PARAMETERS d3dpp;
 	ZeroMemory(&d3dpp, sizeof(d3dpp));
 

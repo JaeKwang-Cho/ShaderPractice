@@ -23,6 +23,65 @@ bool InitEverything(HWND hWnd)
 	}
 	return true;
 }
+bool Setup()
+{
+
+
+	// 뷰 행렬
+	// 카메라의 위치와 방향을 조정한다.
+	D3DXVECTOR3 pos(0.0f, 1.0f, -3.0f);
+	D3DXVECTOR3 target(0.0f, 0.0f, 0.0f);
+	D3DXVECTOR3 up(0.0f, 1.0f, 0.0f);
+	D3DXMATRIX V;
+	D3DXMatrixLookAtLH(&V, &pos, &target, &up);
+
+	gpD3DDevice->SetTransform(D3DTS_VIEW, &V);
+
+	// 투영 매트릭스를 지정한다.
+	D3DXMATRIX proj;
+	D3DXMatrixPerspectiveFovLH(
+		&proj,
+		D3DX_PI * 0.5f, // 90 - degree
+		(float)WIN_WIDTH / (float)WIN_HEIGHT,
+		1.0f,
+		1000.0f);
+
+	gpD3DDevice->SetTransform(D3DTS_PROJECTION, &proj);
+
+	return true;
+}
+
+bool Display(float timeDelta)
+{
+	if (gpD3DDevice)
+	{
+		D3DXMATRIX yRot;
+
+		static float y = 0.0f;
+
+		D3DXMatrixRotationY(&yRot, y);
+		y += timeDelta;
+
+		if (y >= 6.28f)
+			y = 0.0f;
+
+		gpD3DDevice->SetTransform(D3DTS_WORLD, &yRot);
+
+		//
+		// Draw the scene:
+		//
+
+		gpD3DDevice->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0x00000000, 1.0f, 0);
+		gpD3DDevice->BeginScene();
+
+		// do something
+
+		gpD3DDevice->EndScene();
+		gpD3DDevice->Present(0, 0, 0, 0);
+	}
+	return true;
+}
+
 
 // D3D 객체 및 장치 초기화
 bool InitD3D(HWND hWnd)
@@ -89,15 +148,6 @@ bool InitD3D(HWND hWnd)
 
 	return true;
 
-}
-bool Setup()
-{
-	return true;
-}
-bool Display(float timeDelta)
-{
-
-	return true;
 }
 void Cleanup()
 {
