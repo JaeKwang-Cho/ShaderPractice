@@ -226,6 +226,8 @@ bool Display(float timeDelta)
 
 		RenderScene();
 
+		RenderShadow();
+
 		RenderMirror();
 
 		gpD3DDevice->EndScene();
@@ -374,6 +376,71 @@ void RenderMirror()
 	gpD3DDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, false);
 	gpD3DDevice->SetRenderState(D3DRS_STENCILENABLE, false);
 	gpD3DDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_CCW);
+
+}
+void RenderShadow() // 처음 렌더링 되는 픽셀만을 받아들이도록 스텐실 테스트를 구현하면, 이중 그림자를 막을 수 있다.
+{
+	gpD3DDevice->Clear(0, NULL, D3DCLEAR_STENCIL, 0xff000000, 1.0f, 0L);
+
+	// 스텐실 렌더를 켜주고
+	gpD3DDevice->SetRenderState(D3DRS_STENCILENABLE, true);
+	// 같을 때만 성공
+	gpD3DDevice->SetRenderState(D3DRS_STENCILFUNC, D3DCMP_EQUAL);
+	// 0일때만
+	gpD3DDevice->SetRenderState(D3DRS_STENCILREF, 0x0);
+	// 마스는 전부 다 넘김
+	gpD3DDevice->SetRenderState(D3DRS_STENCILMASK, 0xffffffff);
+	gpD3DDevice->SetRenderState(D3DRS_STENCILWRITEMASK, 0xffffffff);
+	// 깊이 테스트가 실패할 경우 스텐실 버퍼를 갱신하지 않음
+	gpD3DDevice->SetRenderState(D3DRS_STENCILZFAIL, D3DSTENCILOP_KEEP);
+	// 스텐실 테스트가 실패할 경우 갱신 안함 (FUNC - ALWAYS의 경우 필요없음)
+	gpD3DDevice->SetRenderState(D3DRS_STENCILFAIL, D3DSTENCILOP_KEEP);
+	// 깊이와 스텐실 테스트가 성공하면 하나를 증가시킨다. 그래서 두번 안일어나게 만든다.
+	gpD3DDevice->SetRenderState(D3DRS_STENCILPASS, D3DSTENCILOP_INCR);
+
+	//주전자를 그림자로 만드는 변환한다.
+	D3DXVECTOR4 lightDirection(0.707f, -0.707f, 0.707f, 0.0f); // 빛의 방향
+	D3DXPLANE groundPlane(0.0f, -1.0f, 0.0f, 0.0f); // 사영할 평면 (-y = 0)
+
+	// 그림자 행렬을 만든다.
+	D3DXMATRIX S;
+	D3DXMatrixShadow(&S, &lightDirection, &groundPlane);
+
+	// 각 주전자의 좌표를
+	D3DXMATRIX T;
+	D3DXMatrixTranslation(&T, TeapotPosition.x, TeapotPosition.y, TeapotPosition.z);
+
+	// 사영시킨다.
+	D3DXMATRIX W = T * S;
+	gpD3DDevice->SetTransform(D3DTS_WORLD, &W);
+
+	// 반 투명한 그림자를 만들기 위해 blend를 켠다.
+	gpD3DDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, true);
+	// 원본 블랜더는 그대로 두고,
+	gpD3DDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+	// 도착 블랜더는 소스의 역으로 둔다.
+	gpD3DDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+
+	// 반투명한 그림자를 지정하고
+	D3DMATERIAL9 mtrl = d3d::InitMtrl(d3d::BLACK, d3d::BLACK, d3d::BLACK, d3d::BLACK, 0.0f);
+	mtrl.Diffuse.a = 0.5f;
+
+	// 바닥에 그림자를 렌더링 할때, z fight가 일어나지 않도록, 깊이 버퍼를 끈다.
+	gpD3DDevice->SetRenderState(D3DRS_ZENABLE, false);
+
+	// 그린다.
+	gpD3DDevice->SetMaterial(&mtrl);
+	gpD3DDevice->SetTexture(0, 0);
+	Teapot->DrawSubset(0);
+
+	// 깊이 버퍼를 다시 킨다.
+	gpD3DDevice->SetRenderState(D3DRS_ZENABLE, true);
+
+	// 블랜더를 끈다.
+	gpD3DDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, false);
+
+	gpD3DDevice->SetRenderState(D3DRS_STENCILENABLE, false);
+
 
 }
 

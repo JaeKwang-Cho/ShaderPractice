@@ -50,6 +50,7 @@ bool InitD3D(HWND hWnd);
 bool Display(float timeDelta);
 void RenderScene();
 void RenderMirror();
+void RenderShadow();
 
 int EnterMsgLoop(
 	bool (*ptr_display) (float timeDelta)
