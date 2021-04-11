@@ -6,17 +6,6 @@
 #define WIN_WIDTH		800
 #define WIN_HEIGHT		600
 
-struct Vertex
-{
-	Vertex(float x, float y, float z, float nx, float ny, float nz)
-	{
-		_x = x; _y = y; _z = z; _nx = nx; _ny = ny; _nz = nz;
-	}
-	float _x, _y, _z;
-	float _nx, _ny, _nz;
-	// 일단은 위치정보만 저장한다.
-	static const DWORD FVF;
-};
 
 namespace d3light
 {
