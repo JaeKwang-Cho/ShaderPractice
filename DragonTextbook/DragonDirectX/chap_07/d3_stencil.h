@@ -22,11 +22,11 @@ namespace d3d
 	// ÀçÁú
 	D3DMATERIAL9 InitMtrl(D3DXCOLOR ambient, D3DXCOLOR diffuse, D3DXCOLOR specular, D3DXCOLOR emissive, float power);
 
-	const D3DMATERIAL9 WHITE_MTRL = d3light::InitMtrl(WHITE, WHITE, WHITE, BLACK, 2.0f);
-	const D3DMATERIAL9 RED_MTRL = d3light::InitMtrl(RED, RED, RED, BLACK, 2.0f);
-	const D3DMATERIAL9 GREEN_MTRL = d3light::InitMtrl(GREEN, GREEN, GREEN, BLACK, 2.0f);
-	const D3DMATERIAL9 BLUE_MTRL = d3light::InitMtrl(BLUE, BLUE, BLUE, BLACK, 2.0f);
-	const D3DMATERIAL9 YELLOW_MTRL = d3light::InitMtrl(YELLOW, YELLOW, YELLOW, BLACK, 2.0f);
+	const D3DMATERIAL9 WHITE_MTRL = d3d::InitMtrl(WHITE, WHITE, WHITE, BLACK, 2.0f);
+	const D3DMATERIAL9 RED_MTRL = d3d::InitMtrl(RED, RED, RED, BLACK, 2.0f);
+	const D3DMATERIAL9 GREEN_MTRL = d3d::InitMtrl(GREEN, GREEN, GREEN, BLACK, 2.0f);
+	const D3DMATERIAL9 BLUE_MTRL = d3d::InitMtrl(BLUE, BLUE, BLUE, BLACK, 2.0f);
+	const D3DMATERIAL9 YELLOW_MTRL = d3d::InitMtrl(YELLOW, YELLOW, YELLOW, BLACK, 2.0f);
 
 	// ºû
 	D3DLIGHT9 InitDirectionalLight(D3DXVECTOR3* direction, D3DXCOLOR* color);
@@ -48,6 +48,8 @@ bool InitD3D(HWND hWnd);
 
 // ·»´õ¸µ
 bool Display(float timeDelta);
+void RenderScene();
+void RenderMirror();
 
 int EnterMsgLoop(
 	bool (*ptr_display) (float timeDelta)

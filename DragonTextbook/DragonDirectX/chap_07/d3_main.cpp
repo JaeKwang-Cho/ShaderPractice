@@ -147,10 +147,10 @@ bool InitD3D(HWND hWnd)
 	d3dpp.hDeviceWindow = hWnd;	// 
 	d3dpp.Windowed = TRUE;
 	d3dpp.EnableAutoDepthStencil = TRUE;
-	d3dpp.AutoDepthStencilFormat = D3DFMT_D24X8; // 깊이/스텐실 버퍼의 포맷
-	d3dpp.Flags = D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
-	d3dpp.FullScreen_RefreshRateInHz = 0;
-	d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_ONE; // 모니터 주사율과 백버퍼를 스왑하는 빈도간의 관계. 이것은 모니터가 수직 동기될 때마다 백버퍼를 스왑해준다.
+	d3dpp.AutoDepthStencilFormat = D3DFMT_D24S8; // 깊이/스텐실 버퍼의 포맷
+	d3dpp.Flags = 0; // 여기 근처에서  stencil 을 맞추어 주어야 한다. 부록을 확인해보자.
+	d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+	d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE; // 모니터 주사율과 백버퍼를 스왑하는 빈도간의 관계. 이것은 모니터가 수직 동기될 때마다 백버퍼를 스왑해준다.
 	// 게임에서는 성능상 모니터의 수직 동기를 기다리지 않고 곧바로 스왑해 주는 경우가 많다.(D3DPRESENT IMMEDIATE) 단, 이럴 때는 전 프레임과 현재 프레임이 서로 찢겨보이는 부작용이 있다.
 
 	// 위 정보(D3DPRESENT_PARAMETERS 구조체)를 가지고 D3D장치를 생성한다.
